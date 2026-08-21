@@ -177,6 +177,13 @@ _None yet._
 - **D-2** (create time) — Error envelope: `ApiClient` reads a non-2xx body
   tolerantly and the backend's code beats the status in `AppException.code`.
   Messages are log-only; copy comes from `forCode`, with the type as fallback.
+- **D-3** (2026-08-21) — build_runner output is **not** committed:
+  `.gitignore` carries `*.freezed.dart`, `*.g.dart` and an unanchored `build/`,
+  matching `bp/bp-mvvm` exactly. `melos build` is therefore a required step on a
+  fresh clone, before `melos analyze`. `.gen.dart` (flutter_gen's
+  `assets.gen.dart` / `fonts.gen.dart`) and `inject.config.dart` stay **tracked**
+  — `*.g.dart` does not match `*.gen.dart`, and that asymmetry is deliberate,
+  not an oversight to "fix".
 
 ## Gotchas
 <!-- append only · NEVER deleted · id G-<n> -->
@@ -192,6 +199,13 @@ _None yet._
   that tells one outage from another in the crash reporter.
 
 ## Session Log
+- _2026-08-21_ — `.gitignore` aligned byte-for-byte with `bp/bp-mvvm`:
+  `/build/` -> `build/` (root-anchored missed `packages/<pkg>/build/`), plus
+  `*.freezed.dart` and `*.g.dart` (see D-3). Untracked the three
+  `packages/core/build/` artifacts the old anchor had let in. `origin` added as
+  `git@bp.github.com:beaupixel25/bp-bloc.git` — the `bp.github.com` SSH alias
+  from `~/.ssh/config`, same form as bp-mvvm, not the plain HTTPS URL. Nothing
+  pushed yet; the GitHub repo is empty.
 <!-- format: `- <YYYY-MM-DD> <what changed> (skill|manual) -> <where it landed>` -->
 <!-- newest first · keep the newest 10 · older entries move verbatim to .claude/memory/CHANGELOG.md -->
 

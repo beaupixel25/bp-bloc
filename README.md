@@ -1,6 +1,6 @@
-# bp-riverpod
+# bp-bloc
 
-A develpoment agency
+A sample BLoC app
 
 A Flutter monorepo: Melos workspace, Clean Architecture, a shared `core`
 package, and one flavored app package per app.
@@ -26,17 +26,17 @@ melos hello   # Prompts for flavor and device
 
 ## Architecture at a glance
 
-| Concern | This workspace |
-|---|---|
-| Workspace | Melos 8 + Dart pub workspace. Every package lives in `packages/`; there is no `melos.yaml` (Melos 6+ reads the `melos:` section of the root `pubspec.yaml`). |
-| Application architecture | Clean Architecture — `domain` / `data` / `presentation`, one folder per feature. |
-| Shared code | `packages/core` — bootstrap, error handling, theme/design-system, reusable components, base classes. Every app package depends on it. |
-| State management | flutter_bloc — one `Bloc` per page, sealed events and states |
-| Dependency injection | `get_it` + `injectable`. Bindings are annotations; the graph is generated into `lib/inject.config.dart` |
-| Routing | `go_router` with typed routes (`@TypedGoRoute` → `routes.g.dart`). |
-| Flavors | `development` / `staging` / `production`, one entrypoint each, plus `main_test.dart`. |
-| Code generation | `build_runner`: `freezed`, `json_serializable`, `go_router_builder`, `injectable_generator` |
-| `core` exports | `full` — a single `core.dart` barrel re-exporting everything under `src/` |
+| Concern                  | This workspace                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Workspace                | Melos 8 + Dart pub workspace. Every package lives in `packages/`; there is no `melos.yaml` (Melos 6+ reads the `melos:` section of the root `pubspec.yaml`). |
+| Application architecture | Clean Architecture — `domain` / `data` / `presentation`, one folder per feature.                                                                             |
+| Shared code              | `packages/core` — bootstrap, error handling, theme/design-system, reusable components, base classes. Every app package depends on it.                        |
+| State management         | flutter_bloc — one `Bloc` per page, sealed events and states                                                                                                 |
+| Dependency injection     | `get_it` + `injectable`. Bindings are annotations; the graph is generated into `lib/inject.config.dart`                                                      |
+| Routing                  | `go_router` with typed routes (`@TypedGoRoute` → `routes.g.dart`).                                                                                           |
+| Flavors                  | `development` / `staging` / `production`, one entrypoint each, plus `main_test.dart`.                                                                        |
+| Code generation          | `build_runner`: `freezed`, `json_serializable`, `go_router_builder`, `injectable_generator`                                                                  |
+| `core` exports           | `full` — a single `core.dart` barrel re-exporting everything under `src/`                                                                                    |
 
 State management is a **monorepo-level** property: `packages/core` itself is
 built around it (the `bootstrap()` signature, the observer, the error-handling
@@ -46,7 +46,7 @@ same setup.
 ## Folder structure
 
 ```
-bp-riverpod/
+bp-bloc/
 ├── pubspec.yaml                    # Workspace root: `workspace:` package list + `melos:` scripts
 ├── analysis_options.yaml           # Workspace lints
 ├── CLAUDE.md                       # Rules + required checklists — auto-loaded by Claude Code
@@ -319,7 +319,7 @@ calls `injector<LoginBloc>()`. Which implementation backs
 `BuildConfiguration` is resolved the same way — `lib/app/view/app.dart` reads
 `injector<BuildConfiguration>().appTitle`. Note that it cannot be a constructor
 dependency of an `@injectable` class: it is registered by hand in `inject.dart`
-*before* `injector.init()`, so injectable's codegen never sees it. To inject it
+_before_ `injector.init()`, so injectable's codegen never sees it. To inject it
 into a repository, provide it from an `@module` with per-environment getters
 instead of registering it directly.
 
@@ -352,11 +352,11 @@ an account, and the backend answers `409` with
 `{"error":{"code":"EMAIL_ALREADY_REGISTERED"}}`.
 
 1. **The wire.** `ApiClient._decode` sees a non-2xx status. `_ApiError.from`
-   reads the body *defensively* — an error response is the least trustworthy
+   reads the body _defensively_ — an error response is the least trustworthy
    thing a server sends — probing `error.code`, then `code`, then `error_code`,
    and falling back to the HTTP status if none is there or the body will not
    parse at all.
-2. **The typed throw.** The status picks the *kind*: `409` is not 401/403/404
+2. **The typed throw.** The status picks the _kind_: `409` is not 401/403/404
    and not ≥500, so it becomes an `UnknownException`; a `422` would be a
    `ValidationException`, a `401` an `UnauthorizedException`. The backend's code
    rides along in `AppException.code`, and the developer-facing detail
@@ -364,7 +364,7 @@ an account, and the backend answers `409` with
 3. **The data boundary.** `BaseRepository.guard` catches it, sees it is already
    an `AppException`, and rethrows it unchanged with
    `Error.throwWithStackTrace` so the original trace survives. Transport
-   failures (`SocketException`, `TimeoutException`) and an unparseable *success*
+   failures (`SocketException`, `TimeoutException`) and an unparseable _success_
    body enter the vocabulary here instead — that split is deliberate, and
    mapping status codes in both places is how two mappings drift apart.
 4. **The domain.** `UseCase.execute` rethrows an `AppException` untouched and
@@ -380,7 +380,7 @@ an account, and the backend answers `409` with
    in instead." An uncoded failure, or a code this app does not recognise,
    falls back to the type: `NetworkException` → `errorNetwork`, and so on.
 7. **The sink.** Sentry (or Crashlytics, or whatever you wire) sees this as a
-   *breadcrumb*, not an issue: the user got a sentence and the app carried on.
+   _breadcrumb_, not an issue: the user got a sentence and the app carried on.
    Had nothing caught it, it would have arrived through
    `ErrorReporter.report` as a crash, with its cause and original stack trace.
 
@@ -534,14 +534,14 @@ an account, and the backend answers `409` with
 
 #### What each layer may and may not do
 
-| Layer | Its job | What it must never do |
-|---|---|---|
-| `ApiClient` | status → exception kind, backend code → `AppException.code` | know a sentence, or map transport/parse failures |
-| `BaseRepository.guard` | raw error → typed `AppException`, trace preserved | `catch (_)`, or re-map what `ApiClient` already typed |
-| `UseCase.execute` | rethrow typed, wrap untyped | swallow anything |
-| `handleBlocAction` | typed failure → state + breadcrumb | catch anything that is not an `AppException` |
-| `AppErrorMessages` | code → sentence, else type → sentence | show `message` verbatim |
-| `ErrorReporter` | crashes as issues, handled failures as breadcrumbs | live in `core` as a vendor SDK |
+| Layer                  | Its job                                                     | What it must never do                                 |
+| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------- |
+| `ApiClient`            | status → exception kind, backend code → `AppException.code` | know a sentence, or map transport/parse failures      |
+| `BaseRepository.guard` | raw error → typed `AppException`, trace preserved           | `catch (_)`, or re-map what `ApiClient` already typed |
+| `UseCase.execute`      | rethrow typed, wrap untyped                                 | swallow anything                                      |
+| `handleBlocAction`     | typed failure → state + breadcrumb                          | catch anything that is not an `AppException`          |
+| `AppErrorMessages`     | code → sentence, else type → sentence                       | show `message` verbatim                               |
+| `ErrorReporter`        | crashes as issues, handled failures as breadcrumbs          | live in `core` as a vendor SDK                        |
 
 Four rules follow, and breaking any of them is what turns a reportable crash
 into a silent one:
@@ -564,7 +564,7 @@ into a silent one:
 #### Wiring a real sink
 
 `core` never depends on a crash reporter. Implement `ErrorReporter` in your app
-and pass it to `bootstrap` — that installs it for the global net *and* for
+and pass it to `bootstrap` — that installs it for the global net _and_ for
 `appErrorReporter`, which is what the handled lane uses:
 
 ```dart
@@ -588,19 +588,19 @@ How the app is configured and initialized, in the order it happens. The numbers
 match the runtime diagram above; the last column is where to make a change of
 that kind.
 
-| # | Component | File | Role | Change it when… |
-|---|---|---|---|---|
-| 1 | `main()` | `packages/hello/lib/main_<flavor>.dart` | The only flavor-aware code in the app: picks the `Environment`, names the root widget, hands both to `bootstrap`. One file per flavor, plus `main_test.dart` for `Environment.test`. | you add a flavor, or need a different root widget per flavor |
-| 2 | `bootstrap()` | `packages/core/lib/src/bootstrap.dart` | Installs the global error net (`FlutterError.onError`, `PlatformDispatcher.onError`, `ErrorWidget.builder`), sets `Bloc.observer`, awaits the `initializer` (DI setup), initializes the binding and URL strategy, then `runApp`s the root widget — all inside a `try`/`catch` that renders a failure surface if composition throws. | you need a new app-wide startup step, a crash reporter, or an `onUnauthorized` handler |
-| 3 | `ErrorReporter` + `AppBlocObserver` | `core/src/error/error_reporter.dart`, `core/src/app_bloc_observer.dart` | `ErrorReporter` is the vendor-agnostic crash sink (`NoopErrorReporter` by default — pass a real one to `bootstrap`). The observer logs bloc transitions, forwards unhandled bloc errors to the reporter, and fires `onUnauthorized` for an `UnauthorizedException`. | you wire Sentry/Crashlytics, or want session expiry to route to sign-in |
-| 4 | `configureInjection()` | `packages/hello/lib/inject.dart` | **The app composition root.** Resets `GetIt`, registers the `BuildConfiguration` for this flavor (app title, base URL, default locale), maps the core `Environment` onto an injectable environment name, then calls `injector.init(environment: …)`. | you change per-flavor endpoints, register something by hand, or add an environment |
-| 5 | `inject.config.dart` | `packages/hello/lib/inject.config.dart` (generated) | Produced by `injectable_generator` from every `@injectable` / `@LazySingleton` annotation in the package. Registers exactly the bindings whose `env:` matches the environment chosen in step 4 — so tests resolve `MockOnboardingRepository` and real builds resolve the network one, with no call-site branching. **Never edit**; run `melos build`. | never directly — change the annotations and regenerate |
-| 6 | `HelloApp` | `packages/hello/lib/app/view/app.dart` | The app's root widget. Owns the `GoRouter` (built in `initState` from the typed routes in `lib/routing/routes.dart`), provides the `AppBloc` (`BlocProvider` + `..start()`), and passes the app title, localization delegates, the theme built from `state.themeMode` and `state.locale` into core's `App`. | you change the initial location, restructure the shell route, or want an app-specific theme |
-| 6a | `AppBloc` | `packages/hello/lib/app/bloc/app_bloc.dart` | **App-wide state**, created once by the app root so it outlives every route. `AppStarted` is the app-wide startup load (`BlocStatus status` + `AppException? failure`, routed through `handleBlocAction`) and sets `isSignedIn` from a stubbed `_restoreSession()` (always `false` today), which `LaunchRoute` reads to choose `/landing` or `/main`; `AppThemeChanged` / `AppLocaleChanged` carry the global theme mode and locale, which `SettingsPage` (tab 2 of the signed-in shell) switches live by dispatching `AppThemeChanged` / `AppLocaleChanged` — the latter takes a `Locale?`, and null means "follow the device". | you have data the whole app needs before its first frame, global UI state more than one screen reads, or a real session check to replace `_restoreSession` with |
-| 7 | `App` / `BaseApp` | `packages/core/lib/src/presentation/views/apps/app/app.dart` | `App` resolves the `AppThemeData` (falling back to the core design system), supplies `MediaQuery` + text scaling, and hosts app-wide overlays as siblings of the `MaterialApp`. `BaseApp` is the `MaterialApp.router` itself: routing, light/dark theme, localization delegates, responsive breakpoints. | you add a global overlay (toasts, alerts), a locale, or a breakpoint |
-| 7a | `LaunchRoute` / `LaunchPage` | `lib/routing/routes.dart`, `lib/app/view/launch_page.dart` | The app's cold start, at `/`. `LaunchRoute` never names a destination — it hands `LaunchPage` an `onResolved` callback, so deleting a feature can never reach it. `LaunchPage` runs the launch sequence's first two stages off one `AnimationController` (0–3400ms): the bento assembly (`bentoIn` → `bentoOut` → `markIn` → `wordmarkIn`), then the hold (`taglineIn` → `taglineOut`). It reads `isSignedIn` off `AppBloc` and calls `onResolved` at the 2950ms sync point, where `surfaceIn` ends — not at the end of the timeline, so the hand-off never plays against a page that is not built yet. Its last frame is the lockup at rest, which is exactly what `/landing` opens on. | you change what a cold start decides between, or restyle the brand-in animation |
-| 8 | `<Page>` | `features/<f>/presentation/view/pages/<page>/<page>_page.dart` | A `StatefulWidget` whose `State` resolves its bloc with `injector<PageBloc>()`, renders with `BlocBuilder`, and runs side effects (navigation, snackbars) with `BlocListener`. | you build or restyle a screen |
-| 9 | `<Page>Bloc` | `…/<page>/<page>_bloc.dart` | The page's state holder: an `@injectable` `Bloc` turning sealed events into sealed states. Depends on use cases only — never on a repository. Wraps calls with `handleBlocAction` so only an `AppException` becomes a failure state. | you add a user action, or change how a screen's state is derived |
+| #   | Component                           | File                                                                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Change it when…                                                                                                                                                 |
+| --- | ----------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `main()`                            | `packages/hello/lib/main_<flavor>.dart`                                 | The only flavor-aware code in the app: picks the `Environment`, names the root widget, hands both to `bootstrap`. One file per flavor, plus `main_test.dart` for `Environment.test`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | you add a flavor, or need a different root widget per flavor                                                                                                    |
+| 2   | `bootstrap()`                       | `packages/core/lib/src/bootstrap.dart`                                  | Installs the global error net (`FlutterError.onError`, `PlatformDispatcher.onError`, `ErrorWidget.builder`), sets `Bloc.observer`, awaits the `initializer` (DI setup), initializes the binding and URL strategy, then `runApp`s the root widget — all inside a `try`/`catch` that renders a failure surface if composition throws.                                                                                                                                                                                                                                                                                                                                                      | you need a new app-wide startup step, a crash reporter, or an `onUnauthorized` handler                                                                          |
+| 3   | `ErrorReporter` + `AppBlocObserver` | `core/src/error/error_reporter.dart`, `core/src/app_bloc_observer.dart` | `ErrorReporter` is the vendor-agnostic crash sink (`NoopErrorReporter` by default — pass a real one to `bootstrap`). The observer logs bloc transitions, forwards unhandled bloc errors to the reporter, and fires `onUnauthorized` for an `UnauthorizedException`.                                                                                                                                                                                                                                                                                                                                                                                                                      | you wire Sentry/Crashlytics, or want session expiry to route to sign-in                                                                                         |
+| 4   | `configureInjection()`              | `packages/hello/lib/inject.dart`                                        | **The app composition root.** Resets `GetIt`, registers the `BuildConfiguration` for this flavor (app title, base URL, default locale), maps the core `Environment` onto an injectable environment name, then calls `injector.init(environment: …)`.                                                                                                                                                                                                                                                                                                                                                                                                                                     | you change per-flavor endpoints, register something by hand, or add an environment                                                                              |
+| 5   | `inject.config.dart`                | `packages/hello/lib/inject.config.dart` (generated)                     | Produced by `injectable_generator` from every `@injectable` / `@LazySingleton` annotation in the package. Registers exactly the bindings whose `env:` matches the environment chosen in step 4 — so tests resolve `MockOnboardingRepository` and real builds resolve the network one, with no call-site branching. **Never edit**; run `melos build`.                                                                                                                                                                                                                                                                                                                                    | never directly — change the annotations and regenerate                                                                                                          |
+| 6   | `HelloApp`                          | `packages/hello/lib/app/view/app.dart`                                  | The app's root widget. Owns the `GoRouter` (built in `initState` from the typed routes in `lib/routing/routes.dart`), provides the `AppBloc` (`BlocProvider` + `..start()`), and passes the app title, localization delegates, the theme built from `state.themeMode` and `state.locale` into core's `App`.                                                                                                                                                                                                                                                                                                                                                                              | you change the initial location, restructure the shell route, or want an app-specific theme                                                                     |
+| 6a  | `AppBloc`                           | `packages/hello/lib/app/bloc/app_bloc.dart`                             | **App-wide state**, created once by the app root so it outlives every route. `AppStarted` is the app-wide startup load (`BlocStatus status` + `AppException? failure`, routed through `handleBlocAction`) and sets `isSignedIn` from a stubbed `_restoreSession()` (always `false` today), which `LaunchRoute` reads to choose `/landing` or `/main`; `AppThemeChanged` / `AppLocaleChanged` carry the global theme mode and locale, which `SettingsPage` (tab 2 of the signed-in shell) switches live by dispatching `AppThemeChanged` / `AppLocaleChanged` — the latter takes a `Locale?`, and null means "follow the device".                                                         | you have data the whole app needs before its first frame, global UI state more than one screen reads, or a real session check to replace `_restoreSession` with |
+| 7   | `App` / `BaseApp`                   | `packages/core/lib/src/presentation/views/apps/app/app.dart`            | `App` resolves the `AppThemeData` (falling back to the core design system), supplies `MediaQuery` + text scaling, and hosts app-wide overlays as siblings of the `MaterialApp`. `BaseApp` is the `MaterialApp.router` itself: routing, light/dark theme, localization delegates, responsive breakpoints.                                                                                                                                                                                                                                                                                                                                                                                 | you add a global overlay (toasts, alerts), a locale, or a breakpoint                                                                                            |
+| 7a  | `LaunchRoute` / `LaunchPage`        | `lib/routing/routes.dart`, `lib/app/view/launch_page.dart`              | The app's cold start, at `/`. `LaunchRoute` never names a destination — it hands `LaunchPage` an `onResolved` callback, so deleting a feature can never reach it. `LaunchPage` runs the launch sequence's first two stages off one `AnimationController` (0–3400ms): the bento assembly (`bentoIn` → `bentoOut` → `markIn` → `wordmarkIn`), then the hold (`taglineIn` → `taglineOut`). It reads `isSignedIn` off `AppBloc` and calls `onResolved` at the 2950ms sync point, where `surfaceIn` ends — not at the end of the timeline, so the hand-off never plays against a page that is not built yet. Its last frame is the lockup at rest, which is exactly what `/landing` opens on. | you change what a cold start decides between, or restyle the brand-in animation                                                                                 |
+| 8   | `<Page>`                            | `features/<f>/presentation/view/pages/<page>/<page>_page.dart`          | A `StatefulWidget` whose `State` resolves its bloc with `injector<PageBloc>()`, renders with `BlocBuilder`, and runs side effects (navigation, snackbars) with `BlocListener`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | you build or restyle a screen                                                                                                                                   |
+| 9   | `<Page>Bloc`                        | `…/<page>/<page>_bloc.dart`                                             | The page's state holder: an `@injectable` `Bloc` turning sealed events into sealed states. Depends on use cases only — never on a repository. Wraps calls with `handleBlocAction` so only an `AppException` becomes a failure state.                                                                                                                                                                                                                                                                                                                                                                                                                                                     | you add a user action, or change how a screen's state is derived                                                                                                |
 
 **Where configuration actually lives.** `BuildConfiguration` (freezed, in
 `core`) holds the per-flavor settings and is registered as a lazy singleton in
@@ -617,7 +617,7 @@ hosting `HomePage`). `/landing` is stage three of the same sequence, on a
 timeline of its own (0–1450ms, starting fresh on every build, not a
 continuation of the launch's): the ambient wash settles out of a 1.05 scale,
 then the sheet lifts 26px off the bottom edge with its five rows staggering in
-behind it. The brand lockup is the one thing that does *not* animate — it
+behind it. The brand lockup is the one thing that does _not_ animate — it
 arrives already at rest, in the position the launch left it.
 
 ## Implementing a new feature
@@ -654,19 +654,19 @@ The same steps in order, and what each one is for:
    `inject.config.dart`, so a new `@injectable` does not exist until you run
    it), then `melos analyze`.
 
-Where each step lands in the diagram: steps 1–3 are the *domain* and *data*
+Where each step lands in the diagram: steps 1–3 are the _domain_ and _data_
 layers of "Inside a feature"; step 3 is the binding half of node (5) of the runtime
 diagram; the UI steps are nodes (8) and (9).
 
 ### Other common changes
 
-| I want to… | Do this |
-|---|---|
-| Add a reusable widget | `/create-component` — scaffolds the Widget + `ThemeData` (+ `ViewModel`) quartet into `core` and exports it |
-| Re-brand the app | `/import-design-system` — applies a design-system bundle to the core theme files |
-| Build a screen from a design prototype | `/implement-prototype` — implements one slice of a Claude Design prototype on this architecture |
-| Give one app its own colours | pass `theme: AppThemeData.fallback(context, lightColorScheme: AppColorScheme.light(…))` to `App` in that app's `lib/app/view/app.dart` |
-| Re-brand every app | edit the semantic aliases in `core/lib/src/presentation/theme/color_palette.dart`, then `melos build:core` |
+| I want to…                             | Do this                                                                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a reusable widget                  | `/create-component` — scaffolds the Widget + `ThemeData` (+ `ViewModel`) quartet into `core` and exports it                            |
+| Re-brand the app                       | `/import-design-system` — applies a design-system bundle to the core theme files                                                       |
+| Build a screen from a design prototype | `/implement-prototype` — implements one slice of a Claude Design prototype on this architecture                                        |
+| Give one app its own colours           | pass `theme: AppThemeData.fallback(context, lightColorScheme: AppColorScheme.light(…))` to `App` in that app's `lib/app/view/app.dart` |
+| Re-brand every app                     | edit the semantic aliases in `core/lib/src/presentation/theme/color_palette.dart`, then `melos build:core`                             |
 
 The complete required-file list for a feature — including the wiring that lives
 outside the feature folder — is in `CLAUDE.md`, under
@@ -679,20 +679,20 @@ are the intended entry points for changes — each one already knows this
 architecture, so using them is what keeps generated code consistent with the
 code that is already here.
 
-| Skill | Use it to |
-|---|---|
-| `implement-feature` | Build a Clean Architecture feature end to end: interview → baseline slice → all three layers → extra pages and components → routing → build |
-| `create-component` | Add a reusable presentation component to `core` (Widget + freezed `ThemeData` + `Theme` + optional `ViewModel`), wire the barrel export, run codegen |
-| `import-design-system` | Apply a design-system bundle (colours, typography, dimensions, components) to the `core` theme files |
-| `implement-prototype` | Implement or update one slice — a page, flow or feature — of a Claude Design prototype on this architecture |
+| Skill                  | Use it to                                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `implement-feature`    | Build a Clean Architecture feature end to end: interview → baseline slice → all three layers → extra pages and components → routing → build          |
+| `create-component`     | Add a reusable presentation component to `core` (Widget + freezed `ThemeData` + `Theme` + optional `ViewModel`), wire the barrel export, run codegen |
+| `import-design-system` | Apply a design-system bundle (colours, typography, dimensions, components) to the `core` theme files                                                 |
+| `implement-prototype`  | Implement or update one slice — a page, flow or feature — of a Claude Design prototype on this architecture                                          |
 
 Three files carry the agent-facing context, and none of them repeat each other:
 
-| File | What it holds |
-|---|---|
-| `CLAUDE.md` | The enforced rules — the dependency rule, the BLoC + injectable rules, and the required-file checklists for a feature and for a component. Claude Code loads it automatically. |
-| `MEMORY.md` | What this app currently *is*: features, components, design system, decisions and gotchas. Imported by `CLAUDE.md`, and updated by each skill as its final step. |
-| `.claude/memory/CHANGELOG.md` | Append-only archive of everything trimmed out of `MEMORY.md`, so history is never lost when memory is compacted. |
+| File                          | What it holds                                                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLAUDE.md`                   | The enforced rules — the dependency rule, the BLoC + injectable rules, and the required-file checklists for a feature and for a component. Claude Code loads it automatically. |
+| `MEMORY.md`                   | What this app currently _is_: features, components, design system, decisions and gotchas. Imported by `CLAUDE.md`, and updated by each skill as its final step.                |
+| `.claude/memory/CHANGELOG.md` | Append-only archive of everything trimmed out of `MEMORY.md`, so history is never lost when memory is compacted.                                                               |
 
 This README is the remaining half: the diagrams, the walkthrough, and the
 reasoning behind the rules.
@@ -703,42 +703,43 @@ All scripts run from the project root.
 
 ### Workspace
 
-| Script | What it does |
-|---|---|
-| `melos bs` | Bootstrap the workspace (built-in) |
-| `melos pub-get` | `flutter pub get` in every package |
-| `melos analyze` | `flutter analyze` in every package |
-| `melos build` | pub get + code generation (build_runner) in every package |
-| `melos build-watch` | Code generation in watch mode |
-| `melos clean` | `flutter clean` in every package |
-| `melos test:unit-widget` | All tests with coverage, randomized ordering |
+| Script                   | What it does                                              |
+| ------------------------ | --------------------------------------------------------- |
+| `melos bs`               | Bootstrap the workspace (built-in)                        |
+| `melos pub-get`          | `flutter pub get` in every package                        |
+| `melos analyze`          | `flutter analyze` in every package                        |
+| `melos build`            | pub get + code generation (build_runner) in every package |
+| `melos build-watch`      | Code generation in watch mode                             |
+| `melos clean`            | `flutter clean` in every package                          |
+| `melos test:unit-widget` | All tests with coverage, randomized ordering              |
 
 ### Core
 
-| Script | What it does |
-|---|---|
-| `melos build:core` | Build core with code generation |
-| `melos clean-build:core` | Clean, then build core with code generation |
-| `melos build:core-demo` | Build core, then resolve the demo app |
-| `melos clean-build:core-demo` | Same, from a clean slate |
-| `melos core:demo` | Launch the core demo app |
+| Script                        | What it does                                |
+| ----------------------------- | ------------------------------------------- |
+| `melos build:core`            | Build core with code generation             |
+| `melos clean-build:core`      | Clean, then build core with code generation |
+| `melos build:core-demo`       | Build core, then resolve the demo app       |
+| `melos clean-build:core-demo` | Same, from a clean slate                    |
+| `melos core:demo`             | Launch the core demo app                    |
 
 ### Apps
 
-| Script | What it does |
-|---|---|
-| `melos build:hello` | Build core, then hello with code generation |
-| `melos clean-build:hello` | Same, from a clean slate |
-| `melos hello` | Run hello (prompts for flavor and device) |
-| `melos hello:development` | Run hello (development flavor, prompts for device) |
-| `melos hello:test` | Run hello (development flavor, lib/main_test.dart, prompts for device) |
-| `melos hello:staging` | Run hello (staging flavor, prompts for device) |
-| `melos hello:production` | Run hello (production flavor, prompts for device) |
-| `melos hello:web-server` | Serve hello headlessly on `web-server` (lib/main_development.dart, port `$WEB_PORT`, default 8087) |
+| Script                    | What it does                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| `melos build:hello`       | Build core, then hello with code generation                                                        |
+| `melos clean-build:hello` | Same, from a clean slate                                                                           |
+| `melos hello`             | Run hello (prompts for flavor and device)                                                          |
+| `melos hello:development` | Run hello (development flavor, prompts for device)                                                 |
+| `melos hello:test`        | Run hello (development flavor, lib/main_test.dart, prompts for device)                             |
+| `melos hello:staging`     | Run hello (staging flavor, prompts for device)                                                     |
+| `melos hello:production`  | Run hello (production flavor, prompts for device)                                                  |
+| `melos hello:web-server`  | Serve hello headlessly on `web-server` (lib/main_development.dart, port `$WEB_PORT`, default 8087) |
 
 ## Flavors
 
 Each app supports multiple flavors (build variants):
+
 - **development** — Local dev backend
 - **staging** — Staging backend
 - **production** — Production backend
@@ -753,7 +754,7 @@ Dependencies point **inward** — outer layers depend on inner layers, never the
 reverse. See [The dependency rule](#5-the-dependency-rule) for the diagram.
 
 - **Domain** — the innermost layer. Pure Dart with no Flutter, no HTTP, no
-  JSON. Holds entities, DTOs, repository *interfaces*, and use cases. It knows
+  JSON. Holds entities, DTOs, repository _interfaces_, and use cases. It knows
   nothing about how data is fetched or how it is displayed.
 - **Data** — implements the repository interfaces declared in domain. Talks to
   external systems (APIs, storage) and maps their payloads into domain types
@@ -793,7 +794,7 @@ is no manual construction and no service locator sprawl in feature code:
 class OnboardingRepository implements IOnboardingRepository { ... }
 ```
 
-- **Repositories** are annotated on the *implementation*, bound to the abstract
+- **Repositories** are annotated on the _implementation_, bound to the abstract
   interface via `as:`, and scoped by environment via `env:`. A parallel
   `data/repositories/mock/` implementation is registered only for the `test`
   environment, so tests resolve the mock and real builds resolve the network
@@ -822,7 +823,7 @@ There are two ways to shape a model relative to its domain type:
 
 - **`extends`** (default) — the model is a plain class that `extends` the domain
   type and adds `@JsonSerializable` + `fromJson`/`toJson` (e.g.
-  `UserModel extends User`). Because the model *is* an instance of the domain
+  `UserModel extends User`). Because the model _is_ an instance of the domain
   type, a repository method typed to return the entity/DTO can return the model
   directly.
 - **`freezed`** — the entity is a `@freezed` class implementing a shared
@@ -838,8 +839,8 @@ The application is organized around **Use Cases**. The guiding rule:
 > Use Cases orchestrate. Services perform work.
 
 **Use Cases** express business intent — a complete operation initiated by a
-user, API request, scheduled job, or external system. Ask *"What is the user
-trying to accomplish?"* If the answer is Register, Login, Checkout, ShipOrder,
+user, API request, scheduled job, or external system. Ask _"What is the user
+trying to accomplish?"_ If the answer is Register, Login, Checkout, ShipOrder,
 RefundPayment → create a Use Case. A Use Case may validate requests, load
 entities, call repositories and services, coordinate business rules, manage
 transactions, publish events, and return a response. It should stay small and

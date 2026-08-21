@@ -5,8 +5,15 @@
 .packages
 .pub-cache/
 .pub/
-/build/
+# Build output in any package, not just the workspace root: `melos build`
+# writes to packages/<pkg>/build/, which a root-anchored `/build/` misses.
+build/
 coverage/
+
+# Generated code — build_runner output (freezed, json_serializable,
+# go_router_builder). Regenerate with `melos build`; never hand-edit.
+*.freezed.dart
+*.g.dart
 
 # Swift Package Manager
 .build/
