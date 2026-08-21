@@ -1,0 +1,190 @@
+name: bp_riverpod_ui
+description: Monorepo workspace for bp-riverpod
+publish_to: none
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+
+workspace:
+  - packages/core
+  - packages/core/demo
+  - packages/hello
+
+dev_dependencies:
+  melos: ^8.2.0
+
+dependency_overrides:
+  # flutter_launcher_icons pins cli_util ^0.4.1, melos 8 needs ^0.5.0,
+  # and a pub workspace resolves once for all members. 0.5.x is
+  # additive over 0.4.x. Drop this when flutter_launcher_icons
+  # relaxes its constraint.
+  cli_util: ^0.5.2
+
+melos:
+  command:
+    version:
+      workspaceChangelog: true
+
+  ide:
+    intellij: true
+
+  scripts:
+    pub-get:
+      run: melos exec -c 1 --fail-fast -- "flutter pub get"
+      description: Get dependencies for all packages
+
+    analyze:
+      run: melos exec -c 1 --fail-fast -- "flutter analyze"
+      description: Run Dart analysis across all packages
+
+    build:
+      run: |
+        melos pub-get \
+        && melos exec -c 1 --fail-fast -- "dart run build_runner build --delete-conflicting-outputs"
+
+    build-watch:
+      run: |
+        melos pub-get \
+        && melos exec -c 1 --fail-fast -- "dart run build_runner watch --delete-conflicting-outputs"
+
+    clean:
+      run: melos exec -c 1 --fail-fast -- 'flutter clean'
+
+    build:core:
+      run: |
+        melos exec --fail-fast --scope='core' -- \
+          'flutter pub get && dart run build_runner build --delete-conflicting-outputs'
+
+    clean-build:core:
+      run: |
+        melos exec --fail-fast --scope='core' -- \
+          'flutter clean && flutter pub get && dart run build_runner build --delete-conflicting-outputs'
+
+    build:core-demo:
+      run: |
+        melos build:core \
+        && melos exec --fail-fast --scope='core_demo' -- \
+          'flutter pub get'
+
+    clean-build:core-demo:
+      run: |
+        melos clean-build:core \
+        && melos exec --fail-fast --scope='core_demo' -- \
+          'flutter clean && flutter pub get'
+
+    core:demo:
+      run: melos exec --scope='core_demo' -- "flutter run"
+
+    run-app:
+      description: "Internal: runs an app based on APP_SCOPE/APP_FLAVOR env"
+      stdio: inherit
+      run: |
+        scope="${APP_SCOPE:-hello}"
+        flavor="${APP_FLAVOR:-}"
+        target="${APP_TARGET:-}"
+
+        if [ -z "$flavor" ]; then
+          echo "Select flavor:"
+          echo "1) development"
+          echo "2) staging"
+          echo "3) production"
+          read -p "Enter choice (1-3): " flavor_choice
+          case $flavor_choice in
+            1) flavor="development"; target="lib/main_development.dart" ;;
+            2) flavor="staging"; target="lib/main_staging.dart" ;;
+            3) flavor="production"; target="lib/main_production.dart" ;;
+            *) echo "Invalid choice. Aborting."; exit 1 ;;
+          esac
+        fi
+
+        echo "Select device:"
+        echo "1) macOS"
+        echo "2) iOS Simulator"
+        echo "3) Chrome"
+        echo "4) Custom Device ID"
+        read -p "Enter choice (1-4): " dev_choice
+        case $dev_choice in
+          1) device="macos" ;;
+          2) device="iPhone" ;;
+          3) device="chrome" ;;
+          4) read -p "Enter specific device ID: " device ;;
+          *) echo "Invalid choice. Aborting."; exit 1 ;;
+        esac
+
+        echo "Select mode (optional, defaults to debug):"
+        echo "1) debug"
+        echo "2) release"
+        read -p "Enter choice (1-2, or press Enter for debug): " mode_choice
+        case $mode_choice in
+          1) mode="--debug" ;;
+          2) mode="--release" ;;
+          "") mode="--debug" ;;
+          *) echo "Invalid choice. Aborting."; exit 1 ;;
+        esac
+
+        exec melos exec --scope="$scope" -- "flutter run --flavor $flavor --target $target -d \"$device\" $mode"
+
+    test:unit-widget:
+      run: melos exec -c 1 --fail-fast -- "flutter test --coverage --test-randomize-ordering-seed random"
+    build:hello:
+      run: |
+        melos build:core \
+        && melos exec --fail-fast --scope='hello' -- \
+          'flutter pub get && dart run build_runner build --delete-conflicting-outputs'
+
+    clean-build:hello:
+      run: |
+        melos clean-build:core \
+        && melos exec --fail-fast --scope='hello' -- \
+          'flutter clean && flutter pub get && dart run build_runner build --delete-conflicting-outputs'
+
+    hello:
+      description: "Run the hello app (prompts for flavor and device)"
+      stdio: inherit
+      env:
+        APP_SCOPE: "hello"
+      run: melos run-app
+
+    hello:development:
+      description: "Run the hello dev app (prompts for device)"
+      stdio: inherit
+      env:
+        APP_SCOPE: "hello"
+        APP_FLAVOR: "development"
+        APP_TARGET: "lib/main_development.dart"
+      run: melos run-app
+
+    hello:test:
+      description: "Run the hello test app (development flavor, prompts for device)"
+      stdio: inherit
+      env:
+        APP_SCOPE: "hello"
+        APP_FLAVOR: "development"
+        APP_TARGET: "lib/main_test.dart"
+      run: melos run-app
+
+    hello:staging:
+      description: "Run the hello staging app (prompts for device)"
+      stdio: inherit
+      env:
+        APP_SCOPE: "hello"
+        APP_FLAVOR: "staging"
+        APP_TARGET: "lib/main_staging.dart"
+      run: melos run-app
+
+    hello:production:
+      description: "Run the hello prod app (prompts for device)"
+      stdio: inherit
+      env:
+        APP_SCOPE: "hello"
+        APP_FLAVOR: "production"
+        APP_TARGET: "lib/main_production.dart"
+      run: melos run-app
+
+    hello:web-server:
+      description: "Serve the hello app headlessly on web-server (port $WEB_PORT, default 8087)"
+      stdio: inherit
+      run: |
+        melos exec --scope='hello' -- \
+          "flutter run -d web-server --web-port ${WEB_PORT:-8087} -t lib/main_development.dart"
+

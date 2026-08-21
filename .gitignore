@@ -1,0 +1,26 @@
+.DS_Store
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+coverage/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+*.iml
+.idea/
+
+# Keep shared VSCode debug configs (launch.json) tracked, ignore the rest.
+# A blanket `.vscode/` would exclude the directory outright and prevent any
+# nested package from re-including its launch.json, so ignore contents instead.
+**/.vscode/*
+!**/.vscode/launch.json
+pubspec.lock
+.env
+.env.local
+*.swp
+*.swo

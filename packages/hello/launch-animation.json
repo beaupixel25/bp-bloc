@@ -1,0 +1,138 @@
+{
+  "$generatedBy": "the project scaffold",
+  "$status": [
+    "DRAFT. The scaffold measured the composition and wired the launch frame; it did",
+    "not write the Flutter launch page. Run the configure-launch-animation",
+    "skill: confirm these numbers with the user, then generate",
+    "lib/app/view/launch_page.dart and its timeline tests from them.",
+    "Nothing in the app reads this file until that page exists."
+  ],
+  "ground": {
+    "$comment": [
+      "ColorScheme.surface in the light theme, flattened to a literal. One",
+      "value for both brightnesses: the OS launch frame cannot read the",
+      "theme, and a translucent dark surface is not a usable frame colour.",
+      "The same literal is in flutter_native_splash.yaml — they must stay",
+      "equal."
+    ],
+    "light": "#FFFFFF",
+    "dark": "#FFFFFF"
+  },
+  "brand": {
+    "$comment": [
+      "The composition is the mark in motion; the SVG is the mark at rest,",
+      "for the frames on either side of it."
+    ],
+    "composition": "assets/lottie/launch.json",
+    "mark": "assets/brand/brand_logo.svg",
+    "wordmark": "assets/brand/wordmark.svg"
+  },
+  "native": {
+    "tier": "flat",
+    "$comment": [
+      "flat: the OS frame is a solid colour and every beat runs in Flutter.",
+      "Chosen over the `lottie` default because a native overlay means",
+      "Swift + Kotlin sources and a native Lottie dependency that no",
+      "scaffolder can verify without hardware — and because flat cannot",
+      "flash. Tier `lottie` buys motion during engine boot; the composition",
+      "is already staged for it if you want to upgrade."
+    ],
+    "composition": "assets/lottie/launch.json"
+  },
+  "flutter": {
+    "totalMs": 2550,
+    "page": "LaunchPage",
+    "destination": {
+      "route": "LandingRoute",
+      "view": "LandingView"
+    },
+    "syncPointMs": 1350,
+    "reducedMotionMs": 400,
+    "warmUp": {
+      "$comment": [
+        "Rule 4: decode before the clock starts, inside the page rather than",
+        "in main(). The first ground frame is identical to the native one,",
+        "so the wait is invisible; the cap is what keeps a failed decode",
+        "from hanging the launch."
+      ],
+      "await": [
+        "assets/lottie/launch.json",
+        "assets/brand/brand_logo.svg"
+      ],
+      "kickOff": [],
+      "timeoutMs": 1500
+    },
+    "beats": [
+      {
+        "id": "composition",
+        "from": 0,
+        "to": 1150,
+        "curve": "linear",
+        "$comment": "measured from the Lottie header (60fps); rule 6 keeps the driving Interval linear so the composition owns its own easing"
+      },
+      {
+        "id": "surfaceIn",
+        "from": 1000,
+        "to": 1350,
+        "curve": "easeInOut",
+        "$comment": "opaque BY the sync point, before the ground clears"
+      },
+      {
+        "id": "brandOut",
+        "from": 1350,
+        "to": 1800,
+        "curve": "easeInOut"
+      },
+      {
+        "id": "groundOut",
+        "from": 1350,
+        "to": 1750,
+        "curve": "easeInOut"
+      },
+      {
+        "id": "revealHeader",
+        "from": 1350,
+        "to": 2000,
+        "curve": "easeOut",
+        "target": "header",
+        "shift": {
+          "dy": 70
+        }
+      },
+      {
+        "id": "revealLogin",
+        "from": 1600,
+        "to": 2300,
+        "curve": "easeOut",
+        "target": "login",
+        "shift": {
+          "dy": 44
+        }
+      },
+      {
+        "id": "revealSignup",
+        "from": 1800,
+        "to": 2550,
+        "curve": "easeOut",
+        "target": "signup",
+        "shift": {
+          "dy": 44
+        }
+      }
+    ],
+    "$invariants": {
+      "surfaceIn.to <= syncPointMs": "1350 <= 1350",
+      "brandOut.from == syncPointMs": "1350 == 1350",
+      "groundOut.from == syncPointMs": "1350 == 1350",
+      "first reveal .from == syncPointMs": "revealHeader 1350 == 1350",
+      "last reveal .to == totalMs": "revealSignup 2550 == 2550",
+      "every from < to, every to <= totalMs": "checked"
+    }
+  },
+  "$source": {
+    "app": "hello",
+    "composition": "GI Native Splash — Lift",
+    "compositionMs": 1150,
+    "compositionSize": "390x844"
+  }
+}

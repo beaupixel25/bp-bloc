@@ -1,0 +1,18 @@
+# Written at project-creation time for the core demo app.
+#
+# Unflavored: packages/core/demo is a plain `flutter create`
+# app, so this writes the stock ic_launcher resources and
+# AppIcon.appiconset. Do not add a
+# flutter_launcher_icons-<flavor>.yaml beside it — one is
+# enough to put the tool in flavor-only mode, and this file
+# would then be ignored entirely.
+#
+# Re-run after replacing the plate, from this directory:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/app_icons/app_icon_demo.png"
+  android: "ic_launcher"
+  min_sdk_android: 21
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"

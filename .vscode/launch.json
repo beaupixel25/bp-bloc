@@ -1,0 +1,92 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "core demo (debug)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/core/demo",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "hello: development (debug)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "program": "lib/main_development.dart",
+      "args": [
+        "--flavor",
+        "development",
+        "--target",
+        "lib/main_development.dart"
+      ]
+    },
+    {
+      "name": "hello: development (profile)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "flutterMode": "profile",
+      "program": "lib/main_development.dart",
+      "args": [
+        "--flavor",
+        "development",
+        "--target",
+        "lib/main_development.dart"
+      ]
+    },
+    {
+      "name": "hello: development (release)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "flutterMode": "release",
+      "program": "lib/main_development.dart",
+      "args": [
+        "--flavor",
+        "development",
+        "--target",
+        "lib/main_development.dart"
+      ]
+    },
+    {
+      "name": "hello: test (debug)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "program": "lib/main_test.dart",
+      "args": [
+        "--flavor",
+        "development",
+        "--target",
+        "lib/main_test.dart"
+      ]
+    },
+    {
+      "name": "hello: staging (debug)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "program": "lib/main_staging.dart",
+      "args": [
+        "--flavor",
+        "staging",
+        "--target",
+        "lib/main_staging.dart"
+      ]
+    },
+    {
+      "name": "hello: production (debug)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "packages/hello",
+      "program": "lib/main_production.dart",
+      "args": [
+        "--flavor",
+        "production",
+        "--target",
+        "lib/main_production.dart"
+      ]
+    }
+  ]
+}

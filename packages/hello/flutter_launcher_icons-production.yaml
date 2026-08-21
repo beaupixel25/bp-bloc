@@ -1,0 +1,16 @@
+# Written at project-creation time from the design bundle's
+# appIcons.production entry. The `-production` suffix must stay equal
+# to the gradle productFlavors name: it selects
+# android/app/src/production/res/ and names the iOS
+# AppIcon-production.appiconset.
+#
+# Re-run after editing, from this directory:
+#   dart run flutter_launcher_icons
+# One run loops every flutter_launcher_icons-*.yaml it finds.
+flutter_launcher_icons:
+  image_path: "assets/app_icons/app_icon.png"
+  android: "ic_launcher"
+  min_sdk_android: 21
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#FFFFFF"

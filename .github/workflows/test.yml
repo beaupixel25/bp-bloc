@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # melos.yaml scripts shell out to `melos` by name, so the executable must
+      # be on PATH -- `dart run melos` only resolves the outer invocation.
+      - name: Install melos
+        run: |
+          dart pub global activate melos ^8.2.0
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Test
+        run: melos test:unit-widget

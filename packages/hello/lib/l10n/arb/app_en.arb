@@ -1,0 +1,17 @@
+{
+    "@@locale": "en",
+    "counterAppBarTitle": "Counter",
+    "@counterAppBarTitle": {
+        "description": "Text shown in the AppBar of the Counter Page"
+    },
+    "errorGeneric": "Something went wrong. Please try again.",
+    "errorNetwork": "Check the connection, then try again.",
+    "errorSessionExpired": "Your session has expired. Please sign in again.",
+    "errorForbidden": "You don't have permission to do that.",
+    "errorNotFound": "We couldn't find what you were looking for.",
+    "errorValidation": "Please check your input and try again.",
+    "errorEmailAlreadyRegistered": "That email already has an account. Log in instead.",
+    "errorInvalidCredentials": "Check the email and password, then try again.",
+    "onboardingShowPassword": "Show password",
+    "onboardingHidePassword": "Hide password"
+}

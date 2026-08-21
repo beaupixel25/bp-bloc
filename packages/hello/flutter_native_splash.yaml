@@ -1,0 +1,30 @@
+# Tier `flat`: the OS launch frame is a solid colour and every beat of the
+# launch runs in Flutter. No native animation, no native code, no native
+# dependency.
+#
+# **Both brightnesses are written, and they differ.** `LaunchPage` grounds on
+# `colorScheme.surface`, which is theme-dependent, so a single colour here
+# matches the Flutter side in one brightness and flashes in the other: a device
+# in dark mode would show this frame, then hand to a first Flutter frame of a
+# different colour. `color` is the light `surface` and `color_dark` is the dark
+# one, so the handoff is seamless either way.
+#
+# The light value is also `ground` in launch-animation.json. Native cannot read
+# the theme, so neither can be derived at runtime — changing a `surface` role
+# means regenerating this file.
+#
+# Written for every project, from the theme's `surface` roles. A
+# `--design-system` bundle changes what those roles resolve to; it is not what
+# decides whether this file exists.
+#
+# Regenerate the native config after changing anything here:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#121212"
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#121212"
+  android: true
+  ios: true
+  web: false

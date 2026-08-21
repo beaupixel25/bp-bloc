@@ -1,0 +1,17 @@
+{
+    "@@locale": "es",
+    "counterAppBarTitle": "Contador",
+    "@counterAppBarTitle": {
+        "description": "Texto mostrado en la AppBar de la página del contador"
+    },
+    "errorGeneric": "Algo salió mal. Inténtalo de nuevo.",
+    "errorNetwork": "Revisa la conexión e inténtalo de nuevo.",
+    "errorSessionExpired": "Tu sesión ha expirado. Vuelve a iniciar sesión.",
+    "errorForbidden": "No tienes permiso para hacer eso.",
+    "errorNotFound": "No pudimos encontrar lo que buscabas.",
+    "errorValidation": "Revisa los datos ingresados e inténtalo de nuevo.",
+    "errorEmailAlreadyRegistered": "Ese correo ya tiene una cuenta. Inicia sesión.",
+    "errorInvalidCredentials": "Revisa el correo y la contraseña e inténtalo de nuevo.",
+    "onboardingShowPassword": "Mostrar contraseña",
+    "onboardingHidePassword": "Ocultar contraseña"
+}

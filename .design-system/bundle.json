@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "palette": {
+    "black": "#141414",
+    "white": "#FFFFFF",
+    "lime10": "#2E3808",
+    "lime30": "#7A9421",
+    "lime50": "#C7E034",
+    "lime70": "#E4EFA8",
+    "lime90": "#F5F9E0",
+    "neutral10": "#141414",
+    "neutral30": "#5B5B5B",
+    "neutral50": "#8F8F8F",
+    "neutral70": "#C7C7C7",
+    "neutral90": "#F4F4F4",
+    "coral40": "#E85A45",
+    "coral70": "#FFD8CF",
+    "darkSurface": "#121212",
+    "darkCard": "#1E1E1E",
+    "darkOutline": "#3A3A3A"
+  },
+  "semantic": {
+    "light": {
+      "primary": "lime50",
+      "onPrimary": "black",
+      "primaryContainer": "lime90",
+      "onPrimaryContainer": "lime10",
+      "secondary": "neutral30",
+      "onSecondary": "white",
+      "secondaryContainer": "neutral90",
+      "onSecondaryContainer": "neutral10",
+      "tertiary": "coral40",
+      "onTertiary": "white",
+      "tertiaryContainer": "coral70",
+      "onTertiaryContainer": "black",
+      "error": "coral40",
+      "onError": "white",
+      "errorContainer": "coral70",
+      "onErrorContainer": "black",
+      "surface": "white",
+      "onSurface": "black",
+      "onSurfaceVariant": "neutral30",
+      "surfaceDim": "neutral90",
+      "surfaceBright": "white",
+      "surfaceContainerLowest": "white",
+      "surfaceContainerLow": "neutral90",
+      "surfaceContainer": "neutral90",
+      "surfaceContainerHigh": "neutral70",
+      "surfaceContainerHighest": "neutral70",
+      "outline": "neutral70",
+      "outlineVariant": "neutral90",
+      "shadow": "black",
+      "scrim": "black",
+      "inversePrimary": "lime30",
+      "inverseSurface": "black",
+      "onInverseSurface": "white"
+    },
+    "dark": {
+      "surface": "darkSurface",
+      "onSurface": "white",
+      "onSurfaceVariant": "neutral50",
+      "surfaceDim": "darkSurface",
+      "surfaceBright": "darkCard",
+      "surfaceContainerLowest": "black",
+      "surfaceContainerLow": "darkSurface",
+      "surfaceContainer": "darkCard",
+      "surfaceContainerHigh": "darkCard",
+      "surfaceContainerHighest": "darkOutline",
+      "outline": "darkOutline",
+      "outlineVariant": "neutral30",
+      "onPrimaryContainer": "lime70",
+      "primaryContainer": "lime10",
+      "secondaryContainer": "darkCard",
+      "onSecondaryContainer": "neutral70",
+      "inverseSurface": "white",
+      "onInverseSurface": "black"
+    }
+  },
+  "colorExtension": {
+    "transparentColor": "#00000000",
+    "routeActive": "lime50",
+    "routeInactive": "neutral70"
+  },
+  "typography": {
+    "font": {
+      "families": [
+        {
+          "family": "Basis Grotesque",
+          "source": "local",
+          "roles": ["displayLarge", "displayMedium", "displaySmall", "headlineLarge", "headlineMedium", "headlineSmall"],
+          "files": [
+            { "asset": "basisgrotesque-light-webfont.woff2", "weight": 300 },
+            { "asset": "basisgrotesque-regular-webfont.woff2", "weight": 400 },
+            { "asset": "basisgrotesque-italic-webfont.woff2", "weight": 400, "style": "italic" },
+            { "asset": "basisgrotesque-medium-webfont.woff2", "weight": 500 },
+            { "asset": "basisgrotesque-bold-webfont.woff2", "weight": 700 },
+            { "asset": "basisgrotesque-bolditalic-webfont.woff2", "weight": 700, "style": "italic" },
+            { "asset": "basisgrotesque-black-webfont.woff2", "weight": 900 }
+          ]
+        },
+        {
+          "family": "Neue Haas Grotesk Display",
+          "source": "local",
+          "default": true,
+          "files": [
+            { "asset": "neuehaasdisplayxxthin-webfont.woff2", "weight": 100 },
+            { "asset": "neuehaasdisplayxthin-webfont.woff2", "weight": 200 },
+            { "asset": "neuehaasdisplaylight-webfont.woff2", "weight": 300 },
+            { "asset": "neuehaasdisplayroman-webfont.woff2", "weight": 400 },
+            { "asset": "neuehaasdisplayromanitalic-webfont.woff2", "weight": 400, "style": "italic" },
+            { "asset": "neuehaasdisplaymedium-webfont.woff2", "weight": 500 },
+            { "asset": "neuehaasdisplaybold-webfont.woff2", "weight": 700 },
+            { "asset": "neuehaasdisplayblack-webfont.woff2", "weight": 900 }
+          ]
+        },
+        {
+          "family": "Basis Grotesque Mono",
+          "source": "local",
+          "roles": ["labelSmall"],
+          "files": [
+            { "asset": "basisgrotesque-mono-webfont.woff2", "weight": 400 },
+            { "asset": "basisgrotesque-monobold-webfont.woff2", "weight": 700 }
+          ]
+        },
+        {
+          "family": "Inconsolata",
+          "source": "local",
+          "files": [
+            { "asset": "inconsolata-regular.woff2", "weight": 400 }
+          ]
+        }
+      ]
+    },
+    "roles": {
+      "displayLarge": { "fontSize": 57, "height": 1.12, "letterSpacing": -0.25, "fontWeight": 700 },
+      "displayMedium": { "fontSize": 45, "height": 1.16, "letterSpacing": 0, "fontWeight": 700 },
+      "displaySmall": { "fontSize": 36, "height": 1.22, "letterSpacing": 0, "fontWeight": 700 },
+      "headlineLarge": { "fontSize": 32, "height": 1.25, "letterSpacing": 0, "fontWeight": 700 },
+      "headlineMedium": { "fontSize": 28, "height": 1.29, "letterSpacing": 0, "fontWeight": 700 },
+      "headlineSmall": { "fontSize": 24, "height": 1.33, "letterSpacing": 0, "fontWeight": 600 },
+      "titleLarge": { "fontSize": 22, "height": 1.27, "letterSpacing": 0, "fontWeight": 600 },
+      "titleMedium": { "fontSize": 16, "height": 1.5, "letterSpacing": 0.15, "fontWeight": 600 },
+      "titleSmall": { "fontSize": 14, "height": 1.43, "letterSpacing": 0.1, "fontWeight": 600 },
+      "labelLarge": { "fontSize": 14, "height": 1.43, "letterSpacing": 0.1, "fontWeight": 600 },
+      "labelMedium": { "fontSize": 12, "height": 1.33, "letterSpacing": 0.5, "fontWeight": 600 },
+      "labelSmall": { "fontSize": 11, "height": 1.45, "letterSpacing": 0.5, "fontWeight": 600 },
+      "bodyLarge": { "fontSize": 16, "height": 1.5, "letterSpacing": 0.15, "fontWeight": 400 },
+      "bodyMedium": { "fontSize": 14, "height": 1.43, "letterSpacing": 0.25, "fontWeight": 400 },
+      "bodySmall": { "fontSize": 12, "height": 1.33, "letterSpacing": 0.4, "fontWeight": 400 }
+    }
+  },
+  "dimensions": {
+    "spacing": { "space4": 4, "space8": 8, "space12": 12, "space16": 16, "space24": 24, "space32": 32, "space40": 40, "space48": 48, "space56": 56, "space64": 64, "space72": 72, "space80": 80 },
+    "radius": { "radiusXs": 8, "radiusSm": 12, "radiusMd": 16, "radiusLg": 24, "radiusXl": 32, "radiusPill": 9999 },
+    "elevation": { "elevationNone": 0, "elevationLow": 1, "elevationMedium": 3, "elevationHigh": 6 }
+  },
+  "components": [
+    { "name": "RideStatusCard", "description": "The primary lime-filled pill card announcing the active or upcoming trip: greeting, search field, or a live 'Next Stop in Xmin' status with driver rating and car. hasViewModel because it renders live trip data.", "hasViewModel": true,
+      "themeFields": [
+        { "name": "background", "type": "Color", "token": "colorScheme.primary" },
+        { "name": "foreground", "type": "Color", "token": "colorScheme.onPrimary" },
+        { "name": "radius", "type": "double", "token": "radiusXl" },
+        { "name": "padding", "type": "EdgeInsets", "token": "space24" }
+      ] },
+    { "name": "RouteTimeline", "description": "Two-stop vertical timeline row (departure → next stop) with a connecting line, a checkmark for the completed leg, and a 'Details +' pill action.", "hasViewModel": true,
+      "themeFields": [
+        { "name": "lineColor", "type": "Color", "token": "colorScheme.outline" },
+        { "name": "activeDot", "type": "Color", "token": "colorExtension.routeActive" },
+        { "name": "inactiveDot", "type": "Color", "token": "colorExtension.routeInactive" },
+        { "name": "spacing", "type": "double", "token": "space12" }
+      ] },
+    { "name": "SearchDestinationField", "description": "Full-width pill search input, 'Where are we going?' placeholder, leading search icon. Sits inside RideStatusCard on the lime ground.", "hasViewModel": false,
+      "themeFields": [
+        { "name": "background", "type": "Color", "token": "colorScheme.surface" },
+        { "name": "radius", "type": "double", "token": "radiusPill" },
+        { "name": "padding", "type": "EdgeInsets", "token": "space16" }
+      ] },
+    { "name": "GreetingHeader", "description": "Name-personalized greeting ('Hi {name}!') with avatar and a one-line prompt beneath it. Headline uses the display family.", "hasViewModel": true,
+      "themeFields": [
+        { "name": "titleStyle", "type": "TextStyle", "token": "textTheme.headlineSmall" },
+        { "name": "subtitleStyle", "type": "TextStyle", "token": "textTheme.bodyMedium" },
+        { "name": "avatarRadius", "type": "double", "token": "radiusPill" }
+      ] },
+    { "name": "TripListItem", "description": "Upcoming/past trip row: date, a small status glyph (on-route check or a warning triangle for action-needed), driver rating chip and car thumbnail.", "hasViewModel": true,
+      "themeFields": [
+        { "name": "background", "type": "Color", "token": "colorScheme.surface" },
+        { "name": "warningColor", "type": "Color", "token": "colorScheme.tertiary" },
+        { "name": "radius", "type": "double", "token": "radiusMd" },
+        { "name": "padding", "type": "EdgeInsets", "token": "space16" }
+      ] },
+    { "name": "BrandButton", "description": "Pill CTA. Lime fill = primary action, ink outline = secondary emphasis, coral fill = destructive (cancel trip). Pressed state flattens to a 10% darker fill, no shadow change.", "hasViewModel": false,
+      "themeFields": [
+        { "name": "background", "type": "Color", "token": "colorScheme.primary" },
+        { "name": "foreground", "type": "Color", "token": "colorScheme.onPrimary" },
+        { "name": "radius", "type": "double", "token": "radiusPill" },
+        { "name": "padding", "type": "EdgeInsets", "token": "space16" }
+      ] }
+  ],
+
+   "appIcons": {
+    "production": { "icon": "app_icon.png", "background": "white" },
+    "development": { "icon": "app_icon_dev.png", "background": "black", "badge": "Dev" },
+    "staging": { "icon": "app_icon_stag.png", "background": "black", "badge": "Stag" }
+  }
+}
