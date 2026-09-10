@@ -87,7 +87,13 @@ awk '/^## Session Log/{f=1;next} /^## /{f=0} f&&/^- /' MEMORY.md | wc -l  # > 20
 - **`core` exports:** `full` — a single `core.dart` barrel
 - **Design system:** a design-system bundle applied at create time
 - **Features:** `onboarding` (baseline slice shipped at create time)
-- **Last verified:** never — run `melos bs && melos build && melos analyze`
+- **Error reporting:** `ErrorReporter` is a get_it registration, not a global,
+  and `bootstrap` owns it end to end — it builds a `ConsoleErrorReporter` when
+  a `main_<flavor>.dart` passes none, installs it in the crash net, and
+  registers that same object after `initializer()`. No main wires anything.
+  See D-4.
+- **Last verified:** 2026-09-10 — `melos build`, `melos analyze` clean,
+  `melos test:unit-widget` passing
 
 ## Feature Map
 <!-- format: | feature | app | entity | pages -> routes | use cases | notes | -->
@@ -184,6 +190,26 @@ _None yet._
   `assets.gen.dart` / `fonts.gen.dart`) and `inject.config.dart` stay **tracked**
   — `*.g.dart` does not match `*.gen.dart`, and that asymmetry is deliberate,
   not an oversight to "fix".
+- **D-4** (2026-09-10, revised) — `ErrorReporter` reaches its consumers through
+  get_it, not through the `appErrorReporter` global (deleted), and **`bootstrap`
+  owns the instance end to end**. It is a nullable parameter: pass one to
+  forward crashes to Sentry/Crashlytics, or pass nothing and `bootstrap` builds
+  a `ConsoleErrorReporter` (which lives in `core`, beside `NoopErrorReporter`,
+  precisely so `core` can construct the default without naming an app class).
+  That one object is installed in `FlutterError.onError` /
+  `PlatformDispatcher.onError`, handed to `AppBlocObserver`, and registered with
+  `injector.registerSingleton<ErrorReporter>` — **after `initializer()`**, see
+  G-5. One door, so the crash lane and the handled lane cannot drift apart, and
+  all four `main_<flavor>.dart` stay free of reporter wiring.
+  It is deliberately **not** annotated: lazy or eager,
+  `@LazySingleton(as: ErrorReporter, env: [...])` means *injectable* calls the
+  constructor, so an annotation yields a second object for the type while the
+  crash lane keeps reporting to the first. A pre-registered type resolves like
+  any other, so a future consumer can take `ErrorReporter` in an `@injectable`
+  constructor with no further wiring.
+  *Supersedes the original D-4 (two doors: `bootstrap(reporter:)` plus
+  `configureInjection(reporter:)`, with a `ConsoleErrorReporter` in the app
+  package). Full text in CHANGELOG.*
 
 ## Gotchas
 <!-- append only · NEVER deleted · id G-<n> -->
@@ -197,8 +223,85 @@ _None yet._
 - **G-3** — Parsing a non-2xx body must stay in a `try`/`catch`: a bare
   `jsonDecode` on an HTML error page throws, losing the status and the `code`
   that tells one outage from another in the crash reporter.
+- **G-4** — `handleBlocAction`'s reporter lookup **must** stay guarded by
+  `GetIt.instance.isRegistered<ErrorReporter>()`. `core`'s own tests and
+  `core/demo` never call `configureInjection`, so an unguarded
+  `GetIt.instance<ErrorReporter>()` throws from *inside* the `on AppException`
+  catch — turning every failure the app handles into a crash it does not, in
+  exactly the code path meant to prevent that. Pinned by *"still routes the
+  failure when no reporter is registered"* in
+  `packages/core/test/error_handling_test.dart`.
+- **G-5** — `configureInjection` opens with `await injector.reset()`, which is
+  why `bootstrap` registers the `ErrorReporter` **after** `await initializer()`
+  and not before: registered earlier, the reset wipes it and every resolution
+  silently falls back to the no-op. `bootstrap` also unregisters first — it runs
+  once per app but once per *test* too, and a bare `registerSingleton` throws on
+  the second call.
+- **G-6** — `melos hello` option **2) iOS Simulator** passes `-d "iPhone"`, and
+  `flutter run` resolves `-d` by **exact-or-prefix** match against
+  *already-running* devices only (`DeviceManager.getDevicesById`, flutter_tools
+  `lib/src/device.dart`). Two consequences: `flutter run` never boots a
+  simulator for you, so with none booted the option matches nothing; and a
+  connected physical iPhone does **not** rescue it, because devices are named
+  `<owner>'s iPhone` and prefix matching is not substring matching. Boot a
+  simulator first (`open -a Simulator`, or `flutter emulators --launch
+  apple_ios_simulator`) — then `-d "iPhone"` prefix-matches e.g. `iPhone 17 Pro`.
+- **G-7** — **`Failed to update packages.` from any `melos` script is noise and
+  has nothing to do with pub.** The `melos` on PATH re-execs through
+  `flutter pub run`, and flutter_tools turns *any* non-zero child exit into that
+  one string (`throwToolExit('Failed to update packages.')`, `lib/src/dart/pub.dart`).
+  `melos exec --scope=hello -- "exit 1"` reproduces it with no pub involved, and
+  one line is printed per nested melos layer. The real error is always further
+  **up** the output, inside the `hello:` block — scroll past the `└> FAILED`
+  summary and read that instead.
 
 ## Session Log
+<!-- format: - _<date>_ — <what changed> -->
+
+- _2026-09-10_ — Debugged a `melos hello` failure; **no source changed**. Root
+  cause was environmental, not a code bug: no iOS Simulator was booted, so
+  `-d "iPhone"` matched nothing (see G-6), and melos's `Failed to update
+  packages.` epilogue hid the real message (see G-7). Verified by booting
+  `iPhone 17 Pro` and re-running the exact inner command — Xcode build done in
+  53.2s, app launched, VM Service attached. `melos.yaml`'s `run-app` script is
+  still unhardened: option 2 remains a bare `device="iPhone"` that assumes a
+  booted simulator.
+- _2026-09-10_ — Revised yesterday's `ErrorReporter` work and propagated it to
+  `bp-mvvm`, `bp-riverpod` and the `bp-cli` generator, so all four repos agree
+  and future generated projects ship it (see the revised D-4, G-4, G-5).
+  `configureInjection(reporter:)` -> `bootstrap` owns the registration;
+  `packages/hello/lib/common/error/console_error_reporter.dart` ->
+  `ConsoleErrorReporter` in `packages/core/lib/src/error/error_reporter.dart`;
+  four hand-wired `main_<flavor>.dart` -> all four back to their generated
+  form. `bootstrap`'s `reporter` is now nullable and it builds the default
+  itself, then registers it after `initializer()` (unregistering first, because
+  a test calls `bootstrap` once per case). Deleted
+  `packages/hello/test/inject_test.dart` — the seam it covered moved into
+  `packages/core/test/bootstrap_test.dart`, which now pins
+  `same(reporter)` between the crash net and the container plus the
+  console-reporter fallback. Every one of these files is now a byte-for-byte
+  copy of `bp create` output; `inject.config.dart` is unchanged, which is the
+  check that nothing got annotated by mistake.
+- _2026-09-08_ — `ErrorReporter` moved from a mutable process global onto DI
+  (see D-4, G-4, G-5). `appErrorReporter` global -> `injector<ErrorReporter>()`.
+  Deleted the global from `core/src/error/error_reporter.dart` and the
+  `appErrorReporter = reporter` line from `bootstrap`; `handleBlocAction` now
+  resolves from `GetIt.instance` behind an `isRegistered` guard;
+  `configureInjection` gained an optional `reporter` (defaulting to
+  `NoopErrorReporter`, which keeps every existing test call site unchanged) and
+  registers it with `registerSingleton`. New
+  `packages/hello/lib/common/error/console_error_reporter.dart` — unannotated
+  on purpose, the swap point for Sentry/Crashlytics. All four
+  `main_<flavor>.dart` build the instance and pass it to both doors, except
+  `main_test.dart`, which reports nothing and takes the defaults. Blocs were
+  **not** changed: no constructor gained a parameter, so `AppBloc`, `LoginBloc`
+  and `SignupBloc` and their tests are untouched. Tests: replaced the deleted
+  global's two seams — `bootstrap_test`'s "installs the reporter as the
+  breadcrumb sink" became "hands the observer the very reporter it was given",
+  and `error_handling_test` now registers through get_it plus a new
+  no-reporter-registered case; new `packages/hello/test/inject_test.dart`
+  pins `same(reporter)` across the registration. `inject.config.dart` is
+  unchanged, which is the check that nothing got annotated by mistake.
 - _2026-08-21_ — `.gitignore` aligned byte-for-byte with `bp/bp-mvvm`:
   `/build/` -> `build/` (root-anchored missed `packages/<pkg>/build/`), plus
   `*.freezed.dart` and `*.g.dart` (see D-3). Untracked the three

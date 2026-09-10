@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:core/src/domain/exceptions/app_exception.dart';
 import 'package:core/src/error/error_reporter.dart';
+import 'package:get_it/get_it.dart';
 
 /// Adds typed error routing to any [Bloc]/[Cubit].
 extension BlocErrorHandling<E, S> on Bloc<E, S> {
@@ -12,8 +13,9 @@ extension BlocErrorHandling<E, S> on Bloc<E, S> {
   /// failures). Anything else propagates out of the event handler so it reaches
   /// the global `AppBlocObserver` (and reporter) instead of being swallowed.
   ///
-  /// A handled failure is still breadcrumbed to `appErrorReporter`: the user
-  /// sees a sentence, and the crash sink sees that it happened.
+  /// A handled failure is still breadcrumbed to the app's [ErrorReporter]: the
+  /// user sees a sentence, and the crash sink sees that it happened. That is
+  /// the instance `bootstrap` registered — the same one the crash lane uses.
   Future<void> handleBlocAction(
     Future<void> Function() action, {
     required void Function(AppException failure) onFailure,
@@ -21,8 +23,21 @@ extension BlocErrorHandling<E, S> on Bloc<E, S> {
     try {
       await action();
     } on AppException catch (failure) {
-      unawaited(appErrorReporter.reportHandled(failure));
+      unawaited(_reporter.reportHandled(failure));
       onFailure(failure);
     }
+  }
+
+  /// The app's reporter, or a no-op when nothing has registered one.
+  ///
+  /// Resolved rather than injected so no bloc has to carry a reporter it does
+  /// not otherwise use. Guarded because `core`'s own tests and the component
+  /// demo never run `bootstrap`: an unguarded lookup would throw from inside
+  /// the failure path, turning a handled failure into a crash.
+  ErrorReporter get _reporter {
+    final locator = GetIt.instance;
+    return locator.isRegistered<ErrorReporter>()
+        ? locator<ErrorReporter>()
+        : const NoopErrorReporter();
   }
 }

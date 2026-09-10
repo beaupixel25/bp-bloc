@@ -9,6 +9,7 @@ import 'package:bloc/bloc.dart';
 // function is unambiguous.
 import 'package:core/core.dart' hide test;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 
 class _TestRepository extends BaseRepository {
   AppException mapError(Object error) =>
@@ -187,12 +188,13 @@ void main() {
       await bloc.close();
     });
 
-    test('breadcrumbs the handled failure to the sink', () async {
+    test('breadcrumbs the handled failure to the registered sink', () async {
       // Handled is not the same as invisible: the user saw a sentence, and
-      // the crash sink still has to know it happened.
+      // the crash sink still has to know it happened. The sink is whatever
+      // `bootstrap` registered — resolved, never held by the bloc.
       final reporter = _RecordingReporter();
-      appErrorReporter = reporter;
-      addTearDown(() => appErrorReporter = const NoopErrorReporter());
+      GetIt.instance.registerSingleton<ErrorReporter>(reporter);
+      addTearDown(GetIt.instance.reset);
 
       final bloc = _TestBloc();
       await bloc.handleBlocAction(
@@ -201,6 +203,22 @@ void main() {
       );
       expect(reporter.handled.single.code, '500');
       expect(reporter.crashes, isEmpty);
+      await bloc.close();
+    });
+
+    test('still routes the failure with no reporter registered', () async {
+      // `core`'s own tests and the component demo never run `bootstrap`. An
+      // unguarded lookup would throw from inside the catch, turning a handled
+      // failure into a crash.
+      expect(GetIt.instance.isRegistered<ErrorReporter>(), isFalse);
+
+      final bloc = _TestBloc();
+      AppException? captured;
+      await bloc.handleBlocAction(
+        () async => throw const ServerException(code: '500'),
+        onFailure: (failure) => captured = failure,
+      );
+      expect(captured?.code, '500');
       await bloc.close();
     });
   });

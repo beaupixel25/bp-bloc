@@ -7,6 +7,7 @@ import 'package:core/src/app_bloc_observer.dart';
 import 'package:core/src/error/error_reporter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:get_it/get_it.dart';
 
 /// Bootstraps the app: installs the global error net, wires the BLoC observer
 /// to the crash [reporter], runs the [initializer] (e.g. DI setup), then runs
@@ -17,24 +18,28 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 /// — injectable's `@preResolve` over SharedPreferences, Firebase, and so on —
 /// can be awaited from it.
 ///
-/// [reporter] defaults to a `NoopErrorReporter`; pass a real one to forward
-/// crashes to Sentry/Crashlytics/etc. [onUnauthorized] is invoked when an
-/// `UnauthorizedException` reaches the observer.
+/// [reporter] is the crash sink, and this function owns it: pass one to
+/// forward crashes to Sentry/Crashlytics/etc., or pass nothing and get a
+/// `ConsoleErrorReporter`. Whichever it is, the same instance is installed in
+/// the global error net, handed to the observer, and registered in the service
+/// locator once [initializer] has run — so the crash lane and the handled lane
+/// (`handleBlocAction`) report to one object and no `main_<flavor>.dart` has
+/// to wire anything.
+///
+/// [onUnauthorized] is invoked when an `UnauthorizedException` reaches the
+/// observer.
 Future<void> bootstrap(
   FutureOr<Widget> Function() builder, {
   required FutureOr<void> Function() initializer,
-  ErrorReporter reporter = const NoopErrorReporter(),
+  ErrorReporter? reporter,
   void Function()? onUnauthorized,
 }) async {
-  // With the other global installs, and deliberately before composition:
-  // a failure `handleBlocAction` captures while `initializer()` runs
-  // would otherwise breadcrumb to the no-op.
-  appErrorReporter = reporter;
+  final sink = reporter ?? const ConsoleErrorReporter();
 
   FlutterError.onError = (details) {
     log(details.exceptionAsString(), stackTrace: details.stack);
     unawaited(
-      reporter.report(details.exception, details.stack ?? StackTrace.current),
+      sink.report(details.exception, details.stack ?? StackTrace.current),
     );
   };
 
@@ -46,7 +51,7 @@ Future<void> bootstrap(
   // the start-up cost a zone imposes on Dart's core libraries.
   PlatformDispatcher.instance.onError = (error, stackTrace) {
     log(error.toString(), stackTrace: stackTrace);
-    unawaited(reporter.report(error, stackTrace));
+    unawaited(sink.report(error, stackTrace));
     return true;
   };
 
@@ -55,7 +60,7 @@ Future<void> bootstrap(
       );
 
   Bloc.observer = AppBlocObserver(
-    reporter: reporter,
+    reporter: sink,
     onUnauthorized: onUnauthorized,
   );
 
@@ -68,6 +73,7 @@ Future<void> bootstrap(
     // binding, and a `@preResolve` dependency that touched a plugin failed on
     // it.
     await initializer();
+    await _registerReporter(sink);
     runApp(await builder());
     // Composition is the one place a bare catch is right: anything at all
     // going wrong here means there is no app, and the alternative is a hang.
@@ -81,9 +87,26 @@ Future<void> bootstrap(
     // throws, it routes the error to its handler and then abandons the future
     // it returned, so `await` on it never returns and `main()` hangs.
     log(error.toString(), stackTrace: stackTrace);
-    unawaited(reporter.report(error, stackTrace));
+    unawaited(sink.report(error, stackTrace));
     runApp(const _BootstrapFailure());
   }
+}
+
+/// Binds [sink] into the service locator so the handled lane resolves the very
+/// object the crash lane reports to.
+///
+/// Called after `initializer()`, never before: `configureInjection` opens with
+/// `await injector.reset()`, which would wipe a registration made earlier.
+///
+/// The unregister-first step is load-bearing rather than defensive. `bootstrap`
+/// runs once per app, but once per *test* as well, and a bare
+/// `registerSingleton` throws on the second call.
+Future<void> _registerReporter(ErrorReporter sink) async {
+  final locator = GetIt.instance;
+  if (locator.isRegistered<ErrorReporter>()) {
+    await locator.unregister<ErrorReporter>();
+  }
+  locator.registerSingleton<ErrorReporter>(sink);
 }
 
 /// Shown when composition itself failed, so there is no app to render.

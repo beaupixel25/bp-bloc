@@ -371,9 +371,11 @@ an account, and the backend answers `409` with
    wraps anything else in an `UnknownException`. Only an `AppException` ever
    reaches presentation.
 5. **The state holder.** `handleBlocAction` catches `AppException` **and nothing
-   else**, records it as state, and breadcrumbs it to `appErrorReporter`.
-   Anything that is not an `AppException` keeps travelling — out of the
-   callback, out of the frame, into the global net.
+   else**, records it as state, and breadcrumbs it to the `ErrorReporter`
+   `bootstrap` registered in the service locator — the
+   same instance the crash lane reports to. Anything that is not an
+   `AppException` keeps travelling — out of the callback, out of the frame,
+   into the global net.
 6. **The sentence.** `failure.toUserMessage(AppErrorMessages(context.l10n))`
    asks `forCode('EMAIL_ALREADY_REGISTERED')` first, which resolves
    `l10n.errorEmailAlreadyRegistered` — "That email already has an account. Log
@@ -516,19 +518,19 @@ an account, and the backend answers `409` with
       │ ErrorReporter.report(error, stackTrace)   core/core.dart   │
       │                                                            │
       │ vendor-agnostic; core never names a crash service          │
-      │ default NoopErrorReporter() discards everything, so a      │
-      │ freshly generated project runs with no backend             │
+      │ bootstrap builds a ConsoleErrorReporter unless an app      │
+      │ passes its own, then binds that one object to both lanes   │
       │                                                            │
       │ an UnauthorizedException also fires onUnauthorized()       │
       │                                                            │
       └────────────────────────────────────────────────────────────┘
-                    │  passed to bootstrap(reporter: …) by main_<flavor>.dart
+                    │  bootstrap(reporter: …) — pass nothing for the console one
                     │
       ┌────────────────────────────────────────────────────────────┐
       │ THIRD PARTY · Sentry · Crashlytics · Bugsnag · …           │
       │                                                            │
       │ your app writes one class implementing ErrorReporter       │
-      │ and passes it in; core has no dependency on it.            │
+      │ and hands it to bootstrap; core depends on none of them.   │
       └────────────────────────────────────────────────────────────┘
 ```
 
@@ -563,12 +565,14 @@ into a silent one:
 
 #### Wiring a real sink
 
-`core` never depends on a crash reporter. Implement `ErrorReporter` in your app
-and pass it to `bootstrap` — that installs it for the global net _and_ for
-`appErrorReporter`, which is what the handled lane uses:
+`core` never depends on a crash reporter. Out of the box `bootstrap` builds a
+`ConsoleErrorReporter`, which writes both lanes to the developer log. To send
+them somewhere real, implement `ErrorReporter` in your app:
 
 ```dart
 class SentryErrorReporter implements ErrorReporter {
+  const SentryErrorReporter();
+
   @override
   Future<void> report(Object error, StackTrace stackTrace) =>
       Sentry.captureException(error, stackTrace: stackTrace);
@@ -582,6 +586,28 @@ class SentryErrorReporter implements ErrorReporter {
 Both methods are required. `implements` takes the interface, never the
 implementation, so the default body on `reportHandled` does not spare you.
 
+Then add one line to whichever `main_<flavor>.dart` should use it — the rest of
+the call stays exactly as generated:
+
+```dart
+await bootstrap(
+  () => const MyApp(),
+  reporter: const SentryErrorReporter(),
+  // ...
+);
+```
+
+**One door, not two.** `bootstrap` owns the instance: it installs that object
+in the global error net and registers it in the service locator once `initializer()` has run. The crash lane and the
+handled lane therefore report to the same object, and there is no second place
+to remember to wire. Pass nothing and the console reporter arrives the same way.
+
+The moment it is bound matters, and it is after `initializer()`: `configureInjection` opens with `await injector.reset()`, so a registration made any earlier would be wiped.
+A failure captured before that point breadcrumbs to a no-op rather than to your
+sink — a window of a few milliseconds during composition, and the reason
+`bootstrap`'s own `try`/`catch` reports composition failures directly rather
+than relying on the handled lane.
+
 ## Startup walkthrough
 
 How the app is configured and initialized, in the order it happens. The numbers
@@ -590,10 +616,10 @@ that kind.
 
 | #   | Component                           | File                                                                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Change it when…                                                                                                                                                 |
 | --- | ----------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `main()`                            | `packages/hello/lib/main_<flavor>.dart`                                 | The only flavor-aware code in the app: picks the `Environment`, names the root widget, hands both to `bootstrap`. One file per flavor, plus `main_test.dart` for `Environment.test`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | you add a flavor, or need a different root widget per flavor                                                                                                    |
+| 1   | `main()`                            | `packages/hello/lib/main_<flavor>.dart`                                 | The only flavor-aware code in the app: picks the `Environment`, builds this flavor's `ErrorReporter`, names the root widget, and hands them to `bootstrap` — passing the reporter on to `configureInjection` too, so both error lanes share one instance. One file per flavor, plus `main_test.dart` for `Environment.test`, which reports nothing and so names no reporter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | you add a flavor, or need a different root widget per flavor                                                                                                    |
 | 2   | `bootstrap()`                       | `packages/core/lib/src/bootstrap.dart`                                  | Installs the global error net (`FlutterError.onError`, `PlatformDispatcher.onError`, `ErrorWidget.builder`), sets `Bloc.observer`, awaits the `initializer` (DI setup), initializes the binding and URL strategy, then `runApp`s the root widget — all inside a `try`/`catch` that renders a failure surface if composition throws.                                                                                                                                                                                                                                                                                                                                                      | you need a new app-wide startup step, a crash reporter, or an `onUnauthorized` handler                                                                          |
-| 3   | `ErrorReporter` + `AppBlocObserver` | `core/src/error/error_reporter.dart`, `core/src/app_bloc_observer.dart` | `ErrorReporter` is the vendor-agnostic crash sink (`NoopErrorReporter` by default — pass a real one to `bootstrap`). The observer logs bloc transitions, forwards unhandled bloc errors to the reporter, and fires `onUnauthorized` for an `UnauthorizedException`.                                                                                                                                                                                                                                                                                                                                                                                                                      | you wire Sentry/Crashlytics, or want session expiry to route to sign-in                                                                                         |
-| 4   | `configureInjection()`              | `packages/hello/lib/inject.dart`                                        | **The app composition root.** Resets `GetIt`, registers the `BuildConfiguration` for this flavor (app title, base URL, default locale), maps the core `Environment` onto an injectable environment name, then calls `injector.init(environment: …)`.                                                                                                                                                                                                                                                                                                                                                                                                                                     | you change per-flavor endpoints, register something by hand, or add an environment                                                                              |
+| 3   | `ErrorReporter` + `AppBlocObserver` | `core/src/error/error_reporter.dart`, `core/src/app_bloc_observer.dart` | `ErrorReporter` is the vendor-agnostic crash sink (`NoopErrorReporter` by default — pass a real one to `bootstrap`, and the same instance to `configureInjection` so the handled lane resolves it). The observer logs bloc transitions, forwards unhandled bloc errors to the reporter, and fires `onUnauthorized` for an `UnauthorizedException`.                                                                                                                                                                                                                                                                                                                                                                                                                      | you wire Sentry/Crashlytics, or want session expiry to route to sign-in                                                                                         |
+| 4   | `configureInjection()`              | `packages/hello/lib/inject.dart`                                        | **The app composition root.** Resets `GetIt`, registers the `ErrorReporter` `main` built (by instance, so the crash lane and the handled lane are one object) and the `BuildConfiguration` for this flavor (app title, base URL, default locale), maps the core `Environment` onto an injectable environment name, then calls `injector.init(environment: …)`.                                                                                                                                                                                                                                                                                                                                                                                                                                     | you change per-flavor endpoints, register something by hand, or add an environment                                                                              |
 | 5   | `inject.config.dart`                | `packages/hello/lib/inject.config.dart` (generated)                     | Produced by `injectable_generator` from every `@injectable` / `@LazySingleton` annotation in the package. Registers exactly the bindings whose `env:` matches the environment chosen in step 4 — so tests resolve `MockOnboardingRepository` and real builds resolve the network one, with no call-site branching. **Never edit**; run `melos build`.                                                                                                                                                                                                                                                                                                                                    | never directly — change the annotations and regenerate                                                                                                          |
 | 6   | `HelloApp`                          | `packages/hello/lib/app/view/app.dart`                                  | The app's root widget. Owns the `GoRouter` (built in `initState` from the typed routes in `lib/routing/routes.dart`), provides the `AppBloc` (`BlocProvider` + `..start()`), and passes the app title, localization delegates, the theme built from `state.themeMode` and `state.locale` into core's `App`.                                                                                                                                                                                                                                                                                                                                                                              | you change the initial location, restructure the shell route, or want an app-specific theme                                                                     |
 | 6a  | `AppBloc`                           | `packages/hello/lib/app/bloc/app_bloc.dart`                             | **App-wide state**, created once by the app root so it outlives every route. `AppStarted` is the app-wide startup load (`BlocStatus status` + `AppException? failure`, routed through `handleBlocAction`) and sets `isSignedIn` from a stubbed `_restoreSession()` (always `false` today), which `LaunchRoute` reads to choose `/landing` or `/main`; `AppThemeChanged` / `AppLocaleChanged` carry the global theme mode and locale, which `SettingsPage` (tab 2 of the signed-in shell) switches live by dispatching `AppThemeChanged` / `AppLocaleChanged` — the latter takes a `Locale?`, and null means "follow the device".                                                         | you have data the whole app needs before its first frame, global UI state more than one screen reads, or a real session check to replace `_restoreSession` with |

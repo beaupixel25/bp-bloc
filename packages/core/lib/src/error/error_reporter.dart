@@ -1,11 +1,14 @@
+import 'dart:developer';
+
 import 'package:core/src/domain/exceptions/app_exception.dart';
 
 /// Vendor-agnostic crash/error sink.
 ///
 /// `core` never depends on a concrete crash reporter (Sentry, Crashlytics,
-/// ...). Apps provide an implementation and pass it to `bootstrap`, which
-/// installs it in the global error net. The default `NoopErrorReporter` does
-/// nothing, so a generated app runs without a backend.
+/// ...). `bootstrap` owns the instance: it constructs a
+/// [ConsoleErrorReporter] unless an app passes its own, installs it in the
+/// global error net, and registers it in the app's container so the handled
+/// lane resolves the very same object.
 abstract class ErrorReporter {
   /// Reports [error] with its [stackTrace] to the backing service.
   ///
@@ -22,8 +25,11 @@ abstract class ErrorReporter {
   Future<void> reportHandled(AppException error) async {}
 }
 
-/// An [ErrorReporter] that discards everything. The default until an app wires
-/// in a real reporter.
+/// An [ErrorReporter] that discards everything.
+///
+/// Not the default — [ConsoleErrorReporter] is. Use this where reporting is
+/// noise rather than signal: a test that exercises a failure on purpose, or a
+/// flavor running against a fake backend.
 class NoopErrorReporter implements ErrorReporter {
   /// Creates a [NoopErrorReporter].
   const NoopErrorReporter();
@@ -37,12 +43,30 @@ class NoopErrorReporter implements ErrorReporter {
   Future<void> reportHandled(AppException error) async {}
 }
 
-/// The sink handled failures are breadcrumbed to. Installed by `bootstrap`.
+/// An [ErrorReporter] that writes to the developer log. What `bootstrap`
+/// constructs when an app passes no reporter of its own.
 ///
-/// A process-global because a handled failure is captured deep in a state
-/// holder, sometimes by a top-level function, and neither can be handed a
-/// reporter without changing every caller.
+/// The single swap point for a real backend: pass
+/// `reporter: const SentryErrorReporter()` to `bootstrap` and every reporting
+/// site in the app follows, because nothing else names a reporter.
 ///
-/// Mutable so a test can install a recorder and restore the no-op in
-/// `tearDown`.
-ErrorReporter appErrorReporter = const NoopErrorReporter();
+/// A default that logs rather than one that discards: a generated app runs
+/// with no backend either way, but this one tells you a crash happened.
+class ConsoleErrorReporter implements ErrorReporter {
+  /// Creates a [ConsoleErrorReporter].
+  const ConsoleErrorReporter();
+
+  @override
+  Future<void> report(Object error, StackTrace stackTrace) async {
+    log('crash: $error', name: 'ErrorReporter', stackTrace: stackTrace);
+  }
+
+  @override
+  Future<void> reportHandled(AppException error) async {
+    // A breadcrumb, not an issue: the user read a sentence and carried on.
+    log(
+      'handled: ${error.runtimeType}(code: ${error.code})',
+      name: 'ErrorReporter',
+    );
+  }
+}
