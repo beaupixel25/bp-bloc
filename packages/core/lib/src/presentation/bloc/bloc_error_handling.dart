@@ -20,10 +20,23 @@ extension BlocErrorHandling<E, S> on Bloc<E, S> {
     Future<void> Function() action, {
     required void Function(AppException failure) onFailure,
   }) async {
+    // Two captures, because they answer two questions. This one, before the
+    // await, still has the whole synchronous caller chain — the call that
+    // set the action off. An async trace keeps only awaiting frames, so by
+    // the catch that caller is usually gone.
+    final invokedAt = StackTrace.current;
     try {
       await action();
     } on AppException catch (failure) {
-      unawaited(_reporter.reportHandled(failure));
+      // And this one, inside the catch: frame 0 is this block, the code that
+      // handles the failure.
+      unawaited(
+        _reporter.reportHandled(
+          failure,
+          handledAt: StackTrace.current,
+          invokedAt: invokedAt,
+        ),
+      );
       onFailure(failure);
     }
   }

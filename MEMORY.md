@@ -210,6 +210,44 @@ _None yet._
   *Supersedes the original D-4 (two doors: `bootstrap(reporter:)` plus
   `configureInjection(reporter:)`, with a `ConsoleErrorReporter` in the app
   package). Full text in CHANGELOG.*
+- **D-5** — the breadcrumb names the wrapped cause (absorbed into D-9; full text in CHANGELOG)
+- **D-6** — handled breadcrumbs carry both ends (superseded by D-9; full text in CHANGELOG)
+- **D-7** — `report` is the only method an implementation writes; `reportHandled` funnels into it with `handled: true`, and the shipped reporters `extends` rather than `implements` (full text in CHANGELOG)
+- **D-8** (2026-09-11) — **`handled at:` is the `on AppException` catch**,
+  not the code that started the action. Frame 0 of a `StackTrace.current`
+  captured inside the catch — `handleBlocAction` — with no filtering, mirroring
+  `thrown at:`, which is frame 0 of the origin trace. The question the field
+  answers is "what code handled this", and the handler is the answer; the
+  caller is a different question. This removed the frame filter entirely
+  (G-8), the entry-time capture (G-9), and the per-variant fork of
+  `errorReporter()` that the filter had forced — the template is one body for
+  all three variants again. Pinned by *"handledAt points at the catch block,
+  not the caller"* and *"names the handling block, frame 0 and unfiltered"*.
+
+- **D-9** (2026-09-11) — A handled breadcrumb carries **three** frames, not
+  two: `thrown at:` (frame 0 of `AppException.stackTrace`), `handled at:`
+  (frame 0 of a capture inside the `on AppException` catch, D-8) and
+  `invoked at:` — what *started* the action, e.g. the `signup.execute()` in a
+  view model. `invokedAt` needs its own capture, taken **before** the await,
+  because an async trace keeps only awaiting frames and a method that returns
+  the command's future without awaiting is gone by the catch (G-9, which
+  therefore applies again — to this field only). It is also the **one**
+  filtered frame: whoever captured it is the top of its own trace, so `core`
+  and the state-management package are stepped over to reach app code (G-8,
+  likewise back, scoped to `_callSiteFrame`). Riverpod passes one trace for
+  both — its observer runs synchronously from `state =`, so the controller is
+  under the framework's frames in the same capture — which is why
+  `errorReporter()` forks on state management: only that variant's skip list
+  needs `package:riverpod/`. The three render as a tree under the
+  `handled:` header — `├─`/`└─`, not an indent, because `dart:developer`
+  hands the console one multi-line string and a console may strip leading
+  whitespace or interleave other output between the lines — and share one
+  colour, since what they need to say is that they belong to the header, not
+  that they differ from each other. `ConsoleErrorReporter.colored` defaults to
+  `kDebugMode`: escape codes are noise in a log file, a CI job, or logcat, so
+  a debug build on a device wants `const ConsoleErrorReporter(colored:
+  false)`. Terminal detection was not an option — `dart:io` is not web-safe
+  and `core` builds for web.
 
 ## Gotchas
 <!-- append only · NEVER deleted · id G-<n> -->
@@ -255,9 +293,41 @@ _None yet._
   **up** the output, inside the `hello:` block — scroll past the `└> FAILED`
   summary and read that instead.
 
-## Session Log
-<!-- format: - _<date>_ — <what changed> -->
+- **G-8** — The breadcrumb's plumbing filter matches **`'(package:core/'`
+  and `'(dart:'` with the opening paren**, never the bare scheme. A frame reads
+  `Member (<uri>:<line>:<col>)`, so a bare `'dart:'` matches the `.dart:` that
+  ends *every* file path — every frame then looks like plumbing, the `orElse`
+  fallback becomes the only branch that runs, and `handled at:` prints
+  `handleBlocAction` for every failure instead of the code that absorbed it. It fails
+  silently and looks plausible. Pinned by *"names the app frame, not the
+  plumbing that caught it"* in `packages/core/test/error_handling_test.dart`.
 
+  **Scope narrowed (D-9):** `handled at:` is frame 0 and
+  unfiltered; the filter survives for `invoked at:` alone.
+- **G-9** — `handledAt` is captured **where the action is invoked**, not in
+  the catch. A Dart async stack trace records only the frames that are
+  *awaiting*: a presentation method written
+  `Future<void> login() => _cmd.execute();` never awaits, so by the time the
+  failure comes back it is gone from the trace and the breadcrumb names
+  whichever widget happened to await — or, if nothing did, falls back to
+  `handleBlocAction` itself. Measured, not assumed: catch-capture lost both the view
+  model and the page; entry-capture keeps the whole synchronous chain. Pinned
+  by *"handledAt reaches a caller that never awaited"* in
+  `packages/core/test/error_handling_test.dart`.
+  **Scope narrowed (D-9):** the catch is the answer for
+  `handled at:`; entry capture is what `invoked at:` uses.
+
+## Session Log
+- _2026-09-11_ — Handled-failure breadcrumbs rebuilt, and the generator with
+  them (D-5…D-8, G-8, G-9). `handled: UnknownException(code: null)` — which
+  names nothing — became the exception's full `toString()` plus `thrown at:`
+  and `handled at:`, both frame 0 and unfiltered; `reportHandled` now funnels
+  into `report` with `handled: true`, so an implementation writes one method
+  and `extends`. Two detours on the way, both reverted and both recorded: a
+  frame filter (G-8) and an entry-time capture (G-9), dropped once
+  `handled at:` was settled as the `on AppException` catch itself. `bp-cli`
+  carries the final shape; the three variants were regenerated from it and
+  verified byte-identical.
 - _2026-09-10_ — Debugged a `melos hello` failure; **no source changed**. Root
   cause was environmental, not a code bug: no iOS Simulator was booted, so
   `-d "iPhone"` matched nothing (see G-6), and melos's `Failed to update

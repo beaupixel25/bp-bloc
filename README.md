@@ -372,10 +372,9 @@ an account, and the backend answers `409` with
    reaches presentation.
 5. **The state holder.** `handleBlocAction` catches `AppException` **and nothing
    else**, records it as state, and breadcrumbs it to the `ErrorReporter`
-   `bootstrap` registered in the service locator — the
-   same instance the crash lane reports to. Anything that is not an
-   `AppException` keeps travelling — out of the callback, out of the frame,
-   into the global net.
+   `bootstrap` registered in the service locator — the same instance the crash
+   lane reports to. Anything that is not an `AppException` keeps travelling —
+   out of the callback, out of the frame, into the global net.
 6. **The sentence.** `failure.toUserMessage(AppErrorMessages(context.l10n))`
    asks `forCode('EMAIL_ALREADY_REGISTERED')` first, which resolves
    `l10n.errorEmailAlreadyRegistered` — "That email already has an account. Log
@@ -383,8 +382,9 @@ an account, and the backend answers `409` with
    falls back to the type: `NetworkException` → `errorNetwork`, and so on.
 7. **The sink.** Sentry (or Crashlytics, or whatever you wire) sees this as a
    _breadcrumb_, not an issue: the user got a sentence and the app carried on.
+   `reportHandled` logs no stack trace, which is the visible difference.
    Had nothing caught it, it would have arrived through
-   `ErrorReporter.report` as a crash, with its cause and original stack trace.
+   `ErrorReporter.report` as a crash, with its stack trace.
 
 #### Where it goes
 
@@ -570,21 +570,63 @@ into a silent one:
 them somewhere real, implement `ErrorReporter` in your app:
 
 ```dart
-class SentryErrorReporter implements ErrorReporter {
+class SentryErrorReporter extends ErrorReporter {
   const SentryErrorReporter();
 
   @override
-  Future<void> report(Object error, StackTrace stackTrace) =>
-      Sentry.captureException(error, stackTrace: stackTrace);
-
-  @override
-  Future<void> reportHandled(AppException error) async =>
-      Sentry.addBreadcrumb(Breadcrumb(message: error.toString()));
+  Future<void> report(
+    Object error,
+    StackTrace stackTrace, {
+    bool handled = false,
+    StackTrace? handledAt,
+    StackTrace? invokedAt,
+  }) async {
+    if (!handled) {
+      await Sentry.captureException(error, stackTrace: stackTrace);
+      return;
+    }
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        message: '$error',
+        data: {'handledAt': '$handledAt', 'invokedAt': '$invokedAt'},
+      ),
+    );
+  }
 }
 ```
 
-Both methods are required. `implements` takes the interface, never the
-implementation, so the default body on `reportHandled` does not spare you.
+**One method, and `extends` rather than `implements`.** Both lanes arrive at
+`report`; `handled` tells them apart. `reportHandled` is concrete on
+`ErrorReporter` and funnels into `report` with `handled: true`, so extending
+gets you that for free — `implements` takes the interface and not the
+implementation, which would put the funnel back on you to reproduce.
+
+`reportHandled` gets three stacks and they answer three questions.
+`error.stackTrace` is where the failure was **thrown**; `handledAt` is the
+code that **handled** it; `invokedAt` is what **started** the action. A count
+of breadcrumbs tells you how often something breaks; the three together tell
+you whether whatever is already catching it is good enough, and which screen
+it came from. `ConsoleErrorReporter` prints one frame of each, as a tree
+under the header (`package:` paths elided here for width):
+
+```text
+handled: ServerException(message: null, code: 500, cause: null)
+├─ thrown at:  OrdersRepository.fetch (orders_repository.dart:41:7)
+├─ handled at: BlocErrorHandling.handleBlocAction (bloc_error_handling.dart:35:9)
+└─ invoked at: OrdersBloc._onLoad (orders_bloc.dart:24:9)
+```
+
+The first two are frame 0 and unfiltered. `guard` rethrows with
+`Error.throwWithStackTrace`, so frame 0 of `error.stackTrace` *is* the throw
+site; `handledAt` is captured inside the `on AppException` catch, so frame 0
+of it is the handler. `invokedAt` is the one that skips frames — whoever
+captured it is itself the top of that trace, so `core` and the
+state-management package are stepped over to reach your call site.
+
+The three rows are coloured whenever `ConsoleErrorReporter.colored` is on,
+which it is by default in debug and off in release. Turn it off with `const ConsoleErrorReporter(colored: false)`
+where escape codes are noise rather than colour: a log file, a CI job, or a
+debug build on a device writing to logcat.
 
 Then add one line to whichever `main_<flavor>.dart` should use it — the rest of
 the call stays exactly as generated:

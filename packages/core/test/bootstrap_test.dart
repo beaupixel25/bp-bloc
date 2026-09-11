@@ -10,16 +10,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
 /// Records what the global error net hands to the crash sink.
-class _RecordingReporter implements ErrorReporter {
+class _RecordingReporter extends ErrorReporter {
   final List<Object> reported = [];
   final List<AppException> handled = [];
+  final List<StackTrace?> handledFrom = [];
 
   @override
-  Future<void> report(Object error, StackTrace stackTrace) async =>
+  Future<void> report(
+    Object error,
+    StackTrace stackTrace, {
+    bool handled = false,
+    StackTrace? handledAt,
+    StackTrace? invokedAt,
+  }) async {
+    if (!handled) {
       reported.add(error);
-
-  @override
-  Future<void> reportHandled(AppException error) async => handled.add(error);
+      return;
+    }
+    this.handled.add(error as AppException);
+    handledFrom.add(handledAt);
+  }
 }
 
 void main() {
